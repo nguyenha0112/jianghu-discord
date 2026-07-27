@@ -9,7 +9,8 @@
     "check": "node --check src/index.js",
     "check:register": "node --check src/register-commands.js",
     "db:test": "node src/scripts/test-supabase.js",
-    "flow:test": "node src/scripts/test-game-flow.js"
+    "flow:test": "node src/scripts/test-game-flow.js",
+    "wordchain:test": "node src/scripts/test-word-chain-modes.js"
   },
   "license": "MIT",
   "dependencies": {

@@ -1,9 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const {
-  buildStatusEmbed,
-  getRoomConfig,
-  getSessionStatus
-} = require("../services/word-chain-service");
+const { buildStatusEmbed, getRoomConfig, getSessionStatus } = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,14 +14,11 @@ module.exports = {
 
     const session = getSessionStatus(interaction.channelId);
     if (!session) {
-      await interaction.reply(
-        "Phòng này đã bật nối từ nhưng hiện chưa có ván nào đang chạy. Dùng `/noitu-tao` để bắt đầu."
-      );
+      await interaction.reply("Phòng này đã bật nối từ nhưng hiện chưa có ván nào đang chạy.");
       return;
     }
 
     const embed = buildStatusEmbed(session, {
-      title: "Nối Từ PvP",
       accent: session.paused ? 0xf39c12 : 0x2ecc71,
       lastMoveLine: "Đây là trạng thái hiện tại của ván."
     });

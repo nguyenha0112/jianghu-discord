@@ -6,29 +6,42 @@ const { buildRoomGuideText } = require("../services/word-chain-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-tao-phong")
-    .setDescription("Bật kênh hiện tại thành phòng chơi nối từ."),
+    .setDescription("Bật kênh hiện tại thành phòng chơi nối từ.")
+    .addStringOption((option) =>
+      option
+        .setName("che_do")
+        .setDescription("Chọn chế độ chơi cho phòng này")
+        .setRequired(true)
+        .addChoices(
+          { name: "PvP", value: "pvp" },
+          { name: "PvE", value: "pve" }
+        )
+    ),
   async execute(interaction) {
     try {
       assertCanManageGameRoom(interaction);
+      const mode = interaction.options.getString("che_do", true);
+
       enableRoom(interaction.channelId, {
         guildId: interaction.guildId,
         channelName: interaction.channel?.name || "unknown",
+        mode,
         createdByUserId: interaction.user.id,
         createdByUsername: interaction.user.username
       });
 
       if (interaction.channel && "setTopic" in interaction.channel && typeof interaction.channel.setTopic === "function") {
-        const nextTopic = "Phong noi tu: !batdau de mo van, !stop de tam dung, !play de tiep tuc.";
+        const nextTopic = `Phong noi tu ${mode.toUpperCase()}: !batdau de mo van, !stop de tam dung, !play de tiep tuc.`;
         await interaction.channel.setTopic(nextTopic).catch(() => {});
       }
 
-      await interaction.reply("Đã bật kênh này thành phòng chơi nối từ.");
+      await interaction.reply(`Đã bật kênh này thành phòng chơi nối từ ${mode.toUpperCase()}.`);
       await interaction.channel.send({
         embeds: [
           {
             color: 0x3498db,
             title: "Hướng dẫn phòng nối từ",
-            description: buildRoomGuideText()
+            description: buildRoomGuideText(mode)
           }
         ]
       });

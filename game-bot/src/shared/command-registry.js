@@ -71,17 +71,27 @@ const commandBuilders = [
     ),
   new SlashCommandBuilder()
     .setName("noitu-tao-phong")
-    .setDescription("Bật kênh hiện tại thành phòng chơi nối từ."),
+    .setDescription("Bật kênh hiện tại thành phòng chơi nối từ.")
+    .addStringOption((option) =>
+      option
+        .setName("che_do")
+        .setDescription("Chọn chế độ chơi cho phòng này")
+        .setRequired(true)
+        .addChoices(
+          { name: "PvP", value: "pvp" },
+          { name: "PvE", value: "pve" }
+        )
+    ),
   new SlashCommandBuilder()
     .setName("noitu-xoa-phong")
     .setDescription("Tắt chế độ phòng chơi nối từ ở kênh hiện tại."),
   new SlashCommandBuilder()
     .setName("noitu-tao")
-    .setDescription("Tạo một ván nối từ trong kênh hiện tại.")
+    .setDescription("Tạo ván nối từ theo chế độ của phòng hiện tại.")
     .addStringOption((option) =>
       option
         .setName("tu_goi_y")
-        .setDescription("Cụm từ mở đầu nếu bạn muốn tự chọn")
+        .setDescription("Cụm mở đầu nếu bạn muốn tự chọn")
         .setRequired(false)
     ),
   new SlashCommandBuilder()

@@ -13,13 +13,14 @@ module.exports = {
       return;
     }
 
+    const scoreboardEntries = [...session.scores.entries()]
+      .filter(([userId]) => userId !== "jianghu-pve-bot")
+      .sort((a, b) => b[1] - a[1]);
+
     const scoreboard =
-      session.scores.size === 0
+      scoreboardEntries.length === 0
         ? "Chưa có ai ghi điểm."
-        : [...session.scores.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([userId, score], index) => `${index + 1}. <@${userId}>: ${score} điểm`)
-            .join("\n");
+        : scoreboardEntries.map(([userId, score], index) => `${index + 1}. <@${userId}>: ${score} điểm`).join("\n");
 
     const rewardResult = await distributeFinalRewards(session);
 
@@ -27,26 +28,12 @@ module.exports = {
       embeds: [
         {
           color: 0xe67e22,
-          title: "Kết thúc ván nối từ",
+          title: `Kết thúc ván nối từ ${session.mode.toUpperCase()}`,
           fields: [
-            {
-              name: "Tổng lượt hợp lệ",
-              value: String(session.moveCount),
-              inline: true
-            },
-            {
-              name: "Chuỗi hiện tại",
-              value: String(session.currentStreak),
-              inline: true
-            },
-            {
-              name: "Bảng điểm",
-              value: scoreboard
-            },
-            {
-              name: "Thưởng cuối ván",
-              value: rewardResult.lines.join("\n")
-            }
+            { name: "Tổng lượt hợp lệ", value: String(session.moveCount), inline: true },
+            { name: "Chuỗi hiện tại", value: String(session.currentStreak), inline: true },
+            { name: "Bảng điểm", value: scoreboard },
+            { name: "Thưởng cuối ván", value: rewardResult.lines.join("\n") }
           ]
         }
       ]

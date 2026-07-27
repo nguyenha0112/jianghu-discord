@@ -28,6 +28,7 @@ function enableRoom(channelId, config) {
   const store = readStore();
   store.rooms[channelId] = {
     enabled: true,
+    mode: config.mode || "pvp",
     ...config,
     updatedAt: new Date().toISOString()
   };
