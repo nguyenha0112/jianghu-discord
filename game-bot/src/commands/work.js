@@ -17,7 +17,8 @@ module.exports = {
         result.profession.rewardText,
         `+${result.reward.xuGain} Xu`,
         `+${result.reward.quantity} ${result.reward.itemName}`,
-        `+${result.reward.xpGain} XP nghe`
+        `+${result.reward.xpGain} XP nghe`,
+        `+${result.reward.playerXpGain} Player XP`
       ].join("\n")
     );
   }

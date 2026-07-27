@@ -15,6 +15,8 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle(`${interaction.user.username} - Jianghu Profile`)
       .addFields(
+        { name: "Player Level", value: String(player.stats.playerLevel), inline: true },
+        { name: "Player XP", value: String(player.stats.playerXp), inline: true },
         { name: "Xu", value: String(player.wallet.xu), inline: true },
         { name: "Ngoc", value: String(player.wallet.ngoc), inline: true },
         { name: "Nghe hien tai", value: currentProfession, inline: true },

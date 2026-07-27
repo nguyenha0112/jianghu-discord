@@ -10,6 +10,8 @@ Day la bot game rieng cho `Jianghu Discord`. No duoc tach khoi utility bot de gi
 - profession selection
 - work loop co cooldown
 - inventory va wallet co luu tru
+- sell loop de doi item thanh Xu
+- transaction log cho kinh te MVP
 
 ## Kien truc
 

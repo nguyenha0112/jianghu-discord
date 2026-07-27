@@ -32,6 +32,14 @@ function defaultPlayer(userId, username) {
       xu: 0,
       ngoc: 0
     },
+    stats: {
+      playerLevel: 1,
+      playerXp: 0,
+      totalXuEarned: 0,
+      totalNgocEarned: 0,
+      totalWorkActions: 0,
+      totalItemsSold: 0
+    },
     inventory: {},
     profession: {
       current: null,

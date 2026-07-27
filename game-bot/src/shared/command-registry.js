@@ -31,7 +31,26 @@ const commandBuilders = [
     .setDescription("Thuc hien hanh dong nghe nghiep de nhan reward."),
   new SlashCommandBuilder()
     .setName("inventory")
-    .setDescription("Xem inventory hien tai cua ban.")
+    .setDescription("Xem inventory hien tai cua ban."),
+  new SlashCommandBuilder()
+    .setName("wallet")
+    .setDescription("Xem tong quan tien te va chi so kinh te cua ban."),
+  new SlashCommandBuilder()
+    .setName("sell")
+    .setDescription("Ban vat pham trong kho de doi Xu.")
+    .addStringOption((option) =>
+      option
+        .setName("item_id")
+        .setDescription("Item ID, vi du river_fish")
+        .setRequired(true)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("quantity")
+        .setDescription("So luong muon ban")
+        .setRequired(true)
+        .setMinValue(1)
+    )
 ];
 
 const commandData = commandBuilders.map((builder) => builder.toJSON());
