@@ -64,4 +64,5 @@ Cap nhat lan cuoi: 2026-07-27
 - [ ] Admin economy log command
 - [x] Ket noi Supabase project
 - [x] Test ket noi Supabase thanh cong
-- [ ] Chuyen storage sang Supabase that
+- [x] Chuyen player va transaction storage sang Supabase
+- [x] Chuyen inventory/runtime hoan toan sang Supabase that

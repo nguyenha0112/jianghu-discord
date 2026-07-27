@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const supabaseStore = require("./supabase-store");
 
 const dataDir = path.join(__dirname, "..", "..", "data");
 const dataFile = path.join(dataDir, "players.json");
@@ -55,20 +56,21 @@ function defaultPlayer(userId, username) {
   };
 }
 
-function ensurePlayer(userId, username) {
+function ensurePlayerLocal(userId, username) {
   const store = readStore();
   if (!store.players[userId]) {
     store.players[userId] = defaultPlayer(userId, username);
     writeStore(store);
   }
-}
-
-function getPlayer(userId) {
-  const store = readStore();
   return store.players[userId];
 }
 
-function updatePlayer(userId, patch) {
+function getPlayerLocal(userId) {
+  const store = readStore();
+  return store.players[userId] || null;
+}
+
+function updatePlayerLocal(userId, patch) {
   const store = readStore();
   const current = store.players[userId];
   store.players[userId] = {
@@ -78,6 +80,42 @@ function updatePlayer(userId, patch) {
   };
   writeStore(store);
   return store.players[userId];
+}
+
+async function ensurePlayer(userId, username) {
+  if (supabaseStore.hasSupabaseConfig()) {
+    try {
+      return await supabaseStore.ensurePlayer(userId, username);
+    } catch (error) {
+      console.error("Supabase ensurePlayer loi, fallback ve JSON:", error.message);
+    }
+  }
+
+  return ensurePlayerLocal(userId, username);
+}
+
+async function getPlayer(userId) {
+  if (supabaseStore.hasSupabaseConfig()) {
+    try {
+      return await supabaseStore.getPlayer(userId);
+    } catch (error) {
+      console.error("Supabase getPlayer loi, fallback ve JSON:", error.message);
+    }
+  }
+
+  return getPlayerLocal(userId);
+}
+
+async function updatePlayer(userId, patch) {
+  if (supabaseStore.hasSupabaseConfig()) {
+    try {
+      return await supabaseStore.updatePlayer(userId, patch);
+    } catch (error) {
+      console.error("Supabase updatePlayer loi, fallback ve JSON:", error.message);
+    }
+  }
+
+  return updatePlayerLocal(userId, patch);
 }
 
 module.exports = {

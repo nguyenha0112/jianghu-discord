@@ -4,9 +4,9 @@ const { doWork } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("work")
-    .setDescription("Thực hiện hành động nghề nghiệp để nhận thưởng."),
+    .setDescription("Thuc hien hanh dong nghe nghiep de nhan thuong."),
   async execute(interaction) {
-    const result = doWork(interaction.user.id, interaction.user.username);
+    const result = await doWork(interaction.user.id, interaction.user.username);
     if (!result.ok) {
       await interaction.reply(result.message);
       return;
@@ -17,7 +17,7 @@ module.exports = {
         result.profession.rewardText,
         `+${result.reward.xuGain} Xu`,
         `+${result.reward.quantity} ${result.reward.itemName}`,
-        `+${result.reward.xpGain} XP nghề`,
+        `+${result.reward.xpGain} XP nghe`,
         `+${result.reward.playerXpGain} Player XP`
       ].join("\n")
     );

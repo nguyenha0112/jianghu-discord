@@ -8,7 +8,8 @@
     "register": "node src/register-commands.js",
     "check": "node --check src/index.js",
     "check:register": "node --check src/register-commands.js",
-    "db:test": "node src/scripts/test-supabase.js"
+    "db:test": "node src/scripts/test-supabase.js",
+    "flow:test": "node src/scripts/test-game-flow.js"
   },
   "license": "MIT",
   "dependencies": {

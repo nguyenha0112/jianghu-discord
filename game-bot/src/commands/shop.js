@@ -4,18 +4,18 @@ const { buyShopItem, getShopListings } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("shop")
-    .setDescription("Xem hoặc mua vật phẩm trong shop.")
+    .setDescription("Xem hoac mua vat pham trong shop.")
     .addStringOption((option) =>
       option
         .setName("shop_id")
-        .setDescription("Nhập shop_id nếu muốn mua ngay")
+        .setDescription("Nhap shop_id neu muon mua ngay")
         .setRequired(false)
     ),
   async execute(interaction) {
     const shopId = interaction.options.getString("shop_id");
 
     if (shopId) {
-      const result = buyShopItem(interaction.user.id, interaction.user.username, shopId);
+      const result = await buyShopItem(interaction.user.id, interaction.user.username, shopId);
       await interaction.reply(result.message);
       return;
     }

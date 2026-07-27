@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const supabaseStore = require("./supabase-store");
 
 const dataDir = path.join(__dirname, "..", "..", "data");
 const dataFile = path.join(dataDir, "transactions.json");
@@ -24,7 +25,7 @@ function writeStore(store) {
   fs.writeFileSync(dataFile, JSON.stringify(store, null, 2));
 }
 
-function appendTransaction(entry) {
+function appendTransactionLocal(entry) {
   const store = readStore();
   store.transactions.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -32,6 +33,18 @@ function appendTransaction(entry) {
     ...entry
   });
   writeStore(store);
+}
+
+function appendTransaction(entry) {
+  if (supabaseStore.hasSupabaseConfig()) {
+    supabaseStore.appendTransaction(entry).catch((error) => {
+      console.error("Supabase appendTransaction loi, fallback ve JSON:", error.message);
+      appendTransactionLocal(entry);
+    });
+    return;
+  }
+
+  appendTransactionLocal(entry);
 }
 
 module.exports = {

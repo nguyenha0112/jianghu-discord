@@ -5,11 +5,7 @@ const sellRates = require("../config/sell-rates");
 const shopItems = require("../config/shop-items");
 const recipes = require("../config/recipes");
 const { appendTransaction } = require("../storage/transaction-store");
-const {
-  ensurePlayer,
-  getPlayer,
-  updatePlayer
-} = require("../storage/player-store");
+const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const WORK_COOLDOWN_MS = 60 * 60 * 1000;
@@ -84,19 +80,20 @@ function addPlayerXp(stats, xpGain) {
   };
 }
 
-function createPlayer(userId, username) {
-  ensurePlayer(userId, username);
+async function createPlayer(userId, username) {
+  await ensurePlayer(userId, username);
   return getPlayer(userId);
 }
 
-function chooseProfession(userId, username, professionId) {
+async function chooseProfession(userId, username, professionId) {
   if (!professions[professionId]) {
     throw new Error("Unknown profession.");
   }
 
-  const player = createPlayer(userId, username);
+  const player = await createPlayer(userId, username);
   const professionState = {
     current: professionId,
+    xp: player.profession.xp,
     levels: {
       ...player.profession.levels,
       [professionId]: player.profession.levels[professionId] || 1
@@ -109,14 +106,14 @@ function chooseProfession(userId, username, professionId) {
   });
 }
 
-function claimDaily(userId, username) {
-  const player = createPlayer(userId, username);
+async function claimDaily(userId, username) {
+  const player = await createPlayer(userId, username);
   const remainingMs = getRemainingMs(player.cooldowns.dailyAt, DAILY_COOLDOWN_MS);
 
   if (remainingMs > 0) {
     return {
       ok: false,
-      message: `Daily chưa sẵn sàng. Quay lại sau ${formatDuration(remainingMs)}.`
+      message: `Daily chua san sang. Quay lai sau ${formatDuration(remainingMs)}.`
     };
   }
 
@@ -131,7 +128,7 @@ function claimDaily(userId, username) {
     20
   );
 
-  const updated = updatePlayer(userId, {
+  const updated = await updatePlayer(userId, {
     username,
     wallet: {
       xu: player.wallet.xu + xuGain,
@@ -157,16 +154,16 @@ function claimDaily(userId, username) {
   return {
     ok: true,
     player: updated,
-    message: `Bạn nhận được ${xuGain} Xu và ${ngocGain} Ngọc từ daily. +20 Player XP.`
+    message: `Ban nhan duoc ${xuGain} Xu va ${ngocGain} Ngoc tu daily. +20 Player XP.`
   };
 }
 
-function doWork(userId, username) {
-  const player = createPlayer(userId, username);
+async function doWork(userId, username) {
+  const player = await createPlayer(userId, username);
   if (!player.profession.current) {
     return {
       ok: false,
-      message: "Bạn chưa chọn nghề. Dùng /choose-profession trước."
+      message: "Ban chua chon nghe. Dung /choose-profession truoc."
     };
   }
 
@@ -174,7 +171,7 @@ function doWork(userId, username) {
   if (remainingMs > 0) {
     return {
       ok: false,
-      message: `Bạn đang hồi sức. Quay lại sau ${formatDuration(remainingMs)}.`
+      message: `Ban dang hoi suc. Quay lai sau ${formatDuration(remainingMs)}.`
     };
   }
 
@@ -196,7 +193,7 @@ function doWork(userId, username) {
     10
   );
 
-  const updated = updatePlayer(userId, {
+  const updated = await updatePlayer(userId, {
     username,
     wallet: {
       ...player.wallet,
@@ -244,12 +241,12 @@ function doWork(userId, username) {
   };
 }
 
-function getProfile(userId, username) {
+async function getProfile(userId, username) {
   return createPlayer(userId, username);
 }
 
-function getWalletSummary(userId, username) {
-  const player = createPlayer(userId, username);
+async function getWalletSummary(userId, username) {
+  const player = await createPlayer(userId, username);
   return {
     wallet: player.wallet,
     stats: player.stats,
@@ -264,8 +261,8 @@ function getShopListings() {
   }));
 }
 
-function buyShopItem(userId, username, shopId) {
-  const player = createPlayer(userId, username);
+async function buyShopItem(userId, username, shopId) {
+  const player = await createPlayer(userId, username);
   const listing = shopItems.find((entry) => entry.shopId === shopId);
 
   if (!listing) {
@@ -282,7 +279,7 @@ function buyShopItem(userId, username, shopId) {
     };
   }
 
-  const updated = updatePlayer(userId, {
+  const updated = await updatePlayer(userId, {
     username,
     wallet: {
       ...player.wallet,
@@ -310,8 +307,8 @@ function buyShopItem(userId, username, shopId) {
   };
 }
 
-function getInventoryLines(userId, username) {
-  const player = createPlayer(userId, username);
+async function getInventoryLines(userId, username) {
+  const player = await createPlayer(userId, username);
   const entries = Object.entries(player.inventory);
 
   if (entries.length === 0) {
@@ -346,8 +343,8 @@ function consumeInputs(inventory, inputs) {
   }, inventory);
 }
 
-function craftRecipe(userId, username, recipeId) {
-  const player = createPlayer(userId, username);
+async function craftRecipe(userId, username, recipeId) {
+  const player = await createPlayer(userId, username);
   const recipe = recipes.find((entry) => entry.recipeId === recipeId);
 
   if (!recipe) {
@@ -372,7 +369,7 @@ function craftRecipe(userId, username, recipeId) {
   }
 
   const inventoryAfterConsume = consumeInputs(player.inventory, recipe.inputs);
-  const updated = updatePlayer(userId, {
+  const updated = await updatePlayer(userId, {
     username,
     wallet: {
       ...player.wallet,
@@ -399,22 +396,22 @@ function craftRecipe(userId, username, recipeId) {
   };
 }
 
-function sellItem(userId, username, itemId, quantity) {
-  const player = createPlayer(userId, username);
+async function sellItem(userId, username, itemId, quantity) {
+  const player = await createPlayer(userId, username);
   const owned = player.inventory[itemId] || 0;
   const sellRate = sellRates[itemId];
 
   if (!sellRate) {
     return {
       ok: false,
-      message: "Vật phẩm này hiện chưa bán được cho hệ thống."
+      message: "Vat pham nay hien chua ban duoc cho he thong."
     };
   }
 
   if (owned < quantity || quantity <= 0) {
     return {
       ok: false,
-      message: "Số lượng không hợp lệ hoặc kho đồ không đủ."
+      message: "So luong khong hop le hoac kho do khong du."
     };
   }
 
@@ -425,7 +422,7 @@ function sellItem(userId, username, itemId, quantity) {
     totalItemsSold: player.stats.totalItemsSold + quantity
   };
 
-  const updated = updatePlayer(userId, {
+  const updated = await updatePlayer(userId, {
     username,
     wallet: {
       ...player.wallet,
@@ -449,7 +446,7 @@ function sellItem(userId, username, itemId, quantity) {
   return {
     ok: true,
     player: updated,
-    message: `Bạn đã bán ${quantity} ${items[itemId]?.name || itemId} và nhận ${xuGain} Xu.`
+    message: `Ban da ban ${quantity} ${items[itemId]?.name || itemId} va nhan ${xuGain} Xu.`
   };
 }
 
