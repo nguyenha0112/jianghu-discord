@@ -30,7 +30,9 @@ const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(
 );
 
 const seedPhrases = ["yêu thương", "bầu trời", "hy vọng", "bình yên", "quê nhà", "hoa hồng", "gia đình", "niềm vui"];
-const START_KEYWORDS = new Set(["!batdau", "!choi", "!play", "bat dau", "bắt đầu", "chơi thôi"]);
+const START_KEYWORDS = new Set(["batdau", "choi", "play", "bat dau", "bắt đầu", "chơi thôi"]);
+const STOP_KEYWORDS = new Set(["stop", "!stop"]);
+const PLAY_KEYWORDS = new Set(["play", "!play"]);
 
 const validPhraseSet = loadValidPhraseSet();
 
@@ -483,14 +485,33 @@ async function handleWordChainMessage(message) {
 
   const raw = (message.content || "").trim();
   const lowered = raw.toLowerCase();
+  const normalizedCommand = normalizePhrase(raw);
   let session = sessions.get(message.channel.id);
 
   if (!session || !session.active) {
+    if (STOP_KEYWORDS.has(lowered) || STOP_KEYWORDS.has(normalizedCommand)) {
+      return {
+        ok: true,
+        silent: false,
+        skipReaction: true,
+        reply: "Hiện chưa có ván nào đang chạy để dừng."
+      };
+    }
+
+    if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
+      return {
+        ok: true,
+        silent: false,
+        skipReaction: true,
+        reply: "Hiện chưa có ván nào để tiếp tục. Hãy nhắn `!batdau` hoặc gửi một cụm 2 tiếng để mở ván mới."
+      };
+    }
+
     if (!shouldAutoStart(raw)) {
       return null;
     }
 
-    const seedPhrase = START_KEYWORDS.has(normalizePhrase(raw)) ? null : raw;
+    const seedPhrase = START_KEYWORDS.has(normalizedCommand) ? null : raw;
     session = startSession({
       guildId: message.guild.id,
       channelId: message.channel.id,
@@ -509,11 +530,13 @@ async function handleWordChainMessage(message) {
 
     return {
       ok: true,
-      silent: true
+      silent: false,
+      skipReaction: true,
+      reply: `Đã mở ván mới. Từ hiện tại là **${session.currentPhrase}**.`
     };
   }
 
-  if (lowered === "!stop") {
+  if (STOP_KEYWORDS.has(lowered) || STOP_KEYWORDS.has(normalizedCommand)) {
     const pausedSession = pauseSession(message.channel.id);
     await sendOrRefreshStatusMessage(message.channel, pausedSession, {
       title: "Nối Từ PvP",
@@ -522,11 +545,13 @@ async function handleWordChainMessage(message) {
     });
     return {
       ok: true,
-      silent: true
+      silent: false,
+      skipReaction: true,
+      reply: "Đã tạm dừng ván nối từ."
     };
   }
 
-  if (lowered === "!play") {
+  if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
     const resumed = resumeSession(message.channel.id);
     scheduleTurnTimeout(resumed, message.channel);
     await sendOrRefreshStatusMessage(message.channel, resumed, {
@@ -536,7 +561,9 @@ async function handleWordChainMessage(message) {
     });
     return {
       ok: true,
-      silent: true
+      silent: false,
+      skipReaction: true,
+      reply: "Đã tiếp tục ván nối từ."
     };
   }
 

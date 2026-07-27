@@ -72,10 +72,12 @@ client.on(Events.MessageCreate, async (message) => {
     return;
   }
 
-  if (result.ok) {
-    await message.react("✅").catch(() => {});
-  } else {
-    await message.react("❌").catch(() => {});
+  if (!result.skipReaction) {
+    if (result.ok) {
+      await message.react("✅").catch(() => {});
+    } else {
+      await message.react("❌").catch(() => {});
+    }
   }
 
   if (result.reply && !result.silent) {
