@@ -4,11 +4,11 @@ const { buyShopItem, getShopListings } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("shop")
-    .setDescription("Xem hoac mua vat pham trong shop.")
+    .setDescription("Xem hoặc mua vật phẩm trong shop.")
     .addStringOption((option) =>
       option
         .setName("shop_id")
-        .setDescription("Nhap shop_id neu muon mua ngay")
+        .setDescription("Nhập shop_id nếu muốn mua ngay")
         .setRequired(false)
     ),
   async execute(interaction) {

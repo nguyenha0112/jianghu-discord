@@ -3,20 +3,20 @@ const { SlashCommandBuilder } = require("discord.js");
 const commandBuilders = [
   new SlashCommandBuilder()
     .setName("ping")
-    .setDescription("Kiem tra bot co dang online khong."),
+    .setDescription("Kiểm tra bot có đang online không."),
   new SlashCommandBuilder()
     .setName("profile")
-    .setDescription("Xem profile Jianghu cua ban."),
+    .setDescription("Xem hồ sơ Jianghu của bạn."),
   new SlashCommandBuilder()
     .setName("daily")
-    .setDescription("Nhan daily hang ngay."),
+    .setDescription("Nhận daily hằng ngày."),
   new SlashCommandBuilder()
     .setName("choose-profession")
-    .setDescription("Chon nghe nghiep chinh cua ban.")
+    .setDescription("Chọn nghề nghiệp chính của bạn.")
     .addStringOption((option) =>
       option
         .setName("profession")
-        .setDescription("Nghe ban muon theo")
+        .setDescription("Nghề bạn muốn theo")
         .setRequired(true)
         .addChoices(
           { name: "Fishing", value: "fishing" },
@@ -28,45 +28,45 @@ const commandBuilders = [
     ),
   new SlashCommandBuilder()
     .setName("work")
-    .setDescription("Thuc hien hanh dong nghe nghiep de nhan reward."),
+    .setDescription("Thực hiện hành động nghề nghiệp để nhận thưởng."),
   new SlashCommandBuilder()
     .setName("inventory")
-    .setDescription("Xem inventory hien tai cua ban."),
+    .setDescription("Xem túi đồ hiện tại của bạn."),
   new SlashCommandBuilder()
     .setName("wallet")
-    .setDescription("Xem tong quan tien te va chi so kinh te cua ban."),
+    .setDescription("Xem tổng quan tiền tệ và chỉ số kinh tế của bạn."),
   new SlashCommandBuilder()
     .setName("sell")
-    .setDescription("Ban vat pham trong kho de doi Xu.")
+    .setDescription("Bán vật phẩm trong kho để đổi Xu.")
     .addStringOption((option) =>
       option
         .setName("item_id")
-        .setDescription("Item ID, vi du river_fish")
+        .setDescription("Item ID, ví dụ river_fish")
         .setRequired(true)
     )
     .addIntegerOption((option) =>
       option
         .setName("quantity")
-        .setDescription("So luong muon ban")
+        .setDescription("Số lượng muốn bán")
         .setRequired(true)
         .setMinValue(1)
     ),
   new SlashCommandBuilder()
     .setName("shop")
-    .setDescription("Xem hoac mua vat pham trong shop.")
+    .setDescription("Xem hoặc mua vật phẩm trong shop.")
     .addStringOption((option) =>
       option
         .setName("shop_id")
-        .setDescription("Nhap shop_id neu muon mua ngay")
+        .setDescription("Nhập shop_id nếu muốn mua ngay")
         .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("craft")
-    .setDescription("Xem hoac thuc hien craft theo cong thuc.")
+    .setDescription("Xem hoặc thực hiện chế tạo theo công thức.")
     .addStringOption((option) =>
       option
         .setName("recipe_id")
-        .setDescription("Nhap recipe_id neu muon craft ngay")
+        .setDescription("Nhập recipe_id nếu muốn chế tạo ngay")
         .setRequired(false)
     )
 ];

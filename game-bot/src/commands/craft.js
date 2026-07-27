@@ -4,11 +4,11 @@ const { craftRecipe, getRecipeListings } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("craft")
-    .setDescription("Xem hoac thuc hien craft theo cong thuc.")
+    .setDescription("Xem hoặc thực hiện chế tạo theo công thức.")
     .addStringOption((option) =>
       option
         .setName("recipe_id")
-        .setDescription("Nhap recipe_id neu muon craft ngay")
+        .setDescription("Nhập recipe_id nếu muốn chế tạo ngay")
         .setRequired(false)
     ),
   async execute(interaction) {
@@ -29,7 +29,7 @@ module.exports = {
             const inputs = recipe.inputs
               .map((input) => `${input.itemId} x${input.quantity}`)
               .join(", ");
-            return `\`${recipe.recipeId}\` - ${recipe.name}\nInput: ${inputs}\nPhi: ${recipe.cost.xu} Xu\nOutput: ${recipe.outputName} x${recipe.output.quantity}`;
+            return `\`${recipe.recipeId}\` - ${recipe.name}\nNguyên liệu: ${inputs}\nPhí: ${recipe.cost.xu} Xu\nKết quả: ${recipe.outputName} x${recipe.output.quantity}`;
           })
           .join("\n\n")
       );

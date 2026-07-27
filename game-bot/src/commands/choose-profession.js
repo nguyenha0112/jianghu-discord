@@ -4,11 +4,11 @@ const { chooseProfession } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("choose-profession")
-    .setDescription("Chon nghe nghiep chinh cua ban.")
+    .setDescription("Chọn nghề nghiệp chính của bạn.")
     .addStringOption((option) =>
       option
         .setName("profession")
-        .setDescription("Nghe ban muon theo")
+        .setDescription("Nghề bạn muốn theo")
         .setRequired(true)
         .addChoices(
           { name: "Fishing", value: "fishing" },
@@ -22,7 +22,7 @@ module.exports = {
     const professionId = interaction.options.getString("profession", true);
     const player = chooseProfession(interaction.user.id, interaction.user.username, professionId);
     await interaction.reply(
-      `Ban da chon nghe ${player.profession.current}. Day se la huong farm chinh cua ban trong Jianghu.`
+      `Bạn đã chọn nghề ${player.profession.current}. Đây sẽ là hướng farm chính của bạn trong Jianghu.`
     );
   }
 };

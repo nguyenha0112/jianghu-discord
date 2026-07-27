@@ -4,17 +4,17 @@ const { sellItem } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("sell")
-    .setDescription("Ban vat pham trong kho de doi Xu.")
+    .setDescription("Bán vật phẩm trong kho để đổi Xu.")
     .addStringOption((option) =>
       option
         .setName("item_id")
-        .setDescription("Item ID, vi du river_fish")
+        .setDescription("Item ID, ví dụ river_fish")
         .setRequired(true)
     )
     .addIntegerOption((option) =>
       option
         .setName("quantity")
-        .setDescription("So luong muon ban")
+        .setDescription("Số lượng muốn bán")
         .setRequired(true)
         .setMinValue(1)
     ),

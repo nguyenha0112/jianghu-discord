@@ -3,8 +3,8 @@ const { SlashCommandBuilder } = require("discord.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("ping")
-    .setDescription("Kiem tra bot co dang online khong."),
+    .setDescription("Kiểm tra bot có đang online không."),
   async execute(interaction) {
-    await interaction.reply("Pong. Jianghu Game Bot dang online.");
+    await interaction.reply("Pong. Jianghu Game Bot đang online.");
   }
 };

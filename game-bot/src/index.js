@@ -7,7 +7,7 @@ const path = require("node:path");
 const token = process.env.DISCORD_TOKEN;
 
 if (!token) {
-  console.error("Missing DISCORD_TOKEN in game-bot/.env");
+  console.error("Thiếu DISCORD_TOKEN trong game-bot/.env");
   process.exit(1);
 }
 
@@ -26,12 +26,12 @@ for (const file of commandFiles) {
   if (command.data && command.execute) {
     client.commands.set(command.data.name, command);
   } else {
-    console.warn(`Skipping invalid command module: ${file}`);
+    console.warn(`Bỏ qua command không hợp lệ: ${file}`);
   }
 }
 
 client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Jianghu Game Bot logged in as ${readyClient.user.tag}`);
+  console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -49,7 +49,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (error) {
     console.error(`Command failed: ${interaction.commandName}`, error);
     const payload = {
-      content: "Lenh gap loi. Kiem tra console de debug.",
+      content: "Lệnh gặp lỗi. Kiểm tra console để debug.",
       ephemeral: true
     };
 

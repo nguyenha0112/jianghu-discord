@@ -4,7 +4,7 @@ const { claimDaily } = require("../services/game-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("daily")
-    .setDescription("Nhan daily hang ngay."),
+    .setDescription("Nhận daily hằng ngày."),
   async execute(interaction) {
     const result = claimDaily(interaction.user.id, interaction.user.username);
     await interaction.reply(result.message);

@@ -48,7 +48,7 @@ Cap nhat lan cuoi: 2026-07-27
 
 ## Discord Runtime
 
-- [ ] Dang ky guild slash commands
+- [x] Dang ky guild slash commands
 - [ ] Test lenh `ping`
 - [ ] Test lenh `daily`
 - [ ] Test lenh `work`

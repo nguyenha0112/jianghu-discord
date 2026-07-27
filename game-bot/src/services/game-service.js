@@ -116,7 +116,7 @@ function claimDaily(userId, username) {
   if (remainingMs > 0) {
     return {
       ok: false,
-      message: `Daily chua san sang. Quay lai sau ${formatDuration(remainingMs)}.`
+      message: `Daily chưa sẵn sàng. Quay lại sau ${formatDuration(remainingMs)}.`
     };
   }
 
@@ -157,7 +157,7 @@ function claimDaily(userId, username) {
   return {
     ok: true,
     player: updated,
-    message: `Ban nhan duoc ${xuGain} Xu va ${ngocGain} Ngoc tu daily. +20 Player XP.`
+    message: `Bạn nhận được ${xuGain} Xu và ${ngocGain} Ngọc từ daily. +20 Player XP.`
   };
 }
 
@@ -166,7 +166,7 @@ function doWork(userId, username) {
   if (!player.profession.current) {
     return {
       ok: false,
-      message: "Ban chua chon nghe. Dung /choose-profession truoc."
+      message: "Bạn chưa chọn nghề. Dùng /choose-profession trước."
     };
   }
 
@@ -174,7 +174,7 @@ function doWork(userId, username) {
   if (remainingMs > 0) {
     return {
       ok: false,
-      message: `Ban dang hoi suc. Quay lai sau ${formatDuration(remainingMs)}.`
+      message: `Bạn đang hồi sức. Quay lại sau ${formatDuration(remainingMs)}.`
     };
   }
 
@@ -407,14 +407,14 @@ function sellItem(userId, username, itemId, quantity) {
   if (!sellRate) {
     return {
       ok: false,
-      message: "Vat pham nay hien chua ban duoc cho he thong."
+      message: "Vật phẩm này hiện chưa bán được cho hệ thống."
     };
   }
 
   if (owned < quantity || quantity <= 0) {
     return {
       ok: false,
-      message: "So luong khong hop le hoac kho do khong du."
+      message: "Số lượng không hợp lệ hoặc kho đồ không đủ."
     };
   }
 
@@ -449,7 +449,7 @@ function sellItem(userId, username, itemId, quantity) {
   return {
     ok: true,
     player: updated,
-    message: `Ban da ban ${quantity} ${items[itemId]?.name || itemId} va nhan ${xuGain} Xu.`
+    message: `Bạn đã bán ${quantity} ${items[itemId]?.name || itemId} và nhận ${xuGain} Xu.`
   };
 }
 
