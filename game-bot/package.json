@@ -7,11 +7,14 @@
     "start": "node src/index.js",
     "register": "node src/register-commands.js",
     "check": "node --check src/index.js",
-    "check:register": "node --check src/register-commands.js"
+    "check:register": "node --check src/register-commands.js",
+    "db:test": "node src/scripts/test-supabase.js"
   },
   "license": "MIT",
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "discord.js": "^14.26.0",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "ws": "^8.18.3"
   }
 }

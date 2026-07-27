@@ -62,4 +62,6 @@ Cap nhat lan cuoi: 2026-07-27
 - [ ] Tool progression
 - [ ] Recipe balance
 - [ ] Admin economy log command
-- [ ] Chuyen storage sang database that
+- [x] Ket noi Supabase project
+- [x] Test ket noi Supabase thanh cong
+- [ ] Chuyen storage sang Supabase that

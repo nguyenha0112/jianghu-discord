@@ -25,3 +25,7 @@ Day la bot game rieng cho `Jianghu Discord`. No duoc tach khoi utility bot de gi
 ## Ghi chu
 
 Storage hien tai dung JSON file de khoi dong nhanh. Day la tam thoi cho MVP local va test guild. Khi economy bat dau co user that, nen chuyen sang PostgreSQL hoac MongoDB va them transaction log day du.
+
+## Supabase
+
+Repo da co khung ket noi Supabase va schema v1 trong [supabase](/C:/Users/Admin/Desktop/discord_server_bot/game-bot/supabase). Hien tai bot van chay tren JSON storage, con Supabase dang duoc chuan bi de chuyen doi an toan tung buoc.
