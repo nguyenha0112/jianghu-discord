@@ -1,5 +1,8 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const { enableRoom, disableRoom } = require("../storage/word-chain-room-store");
 const {
+  normalizePhrase,
   findPlayablePhraseForToken,
   getSessionStatus,
   handleWordChainMessage,
@@ -52,6 +55,47 @@ function createMessage(channel, guildId, content, userId, username) {
   };
 }
 
+function findLoopPair() {
+  const dictionaryPaths = [
+    path.join(__dirname, "..", "..", "data", "vietnamese-compound-phrases.txt"),
+    path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt")
+  ];
+
+  const phrases = [
+    ...new Set(
+      dictionaryPaths
+        .flatMap((filePath) => fs.readFileSync(filePath, "utf8").split(/\r?\n/u))
+        .map((line) => normalizePhrase(line))
+        .filter(Boolean)
+        .filter((phrase) => phrase.split(" ").length === 2)
+    )
+  ];
+
+  const byFirstToken = new Map();
+  for (const phrase of phrases) {
+    const [firstToken] = phrase.split(" ");
+    const group = byFirstToken.get(firstToken) || [];
+    group.push(phrase);
+    byFirstToken.set(firstToken, group);
+  }
+
+  for (const phrase of phrases) {
+    const [firstToken, lastToken] = phrase.split(" ");
+    const candidates = byFirstToken.get(lastToken) || [];
+    for (const candidate of candidates) {
+      const [, candidateLastToken] = candidate.split(" ");
+      if (candidate !== phrase && candidateLastToken === firstToken) {
+        return {
+          opening: phrase,
+          reply: candidate
+        };
+      }
+    }
+  }
+
+  throw new Error("Could not find a loop pair in the word-chain dictionary");
+}
+
 async function runPvpFlow() {
   const channelId = "test-pvp-room";
   disableRoom(channelId);
@@ -98,6 +142,44 @@ async function runPvpFlow() {
     firstPhrase,
     acceptedReply: validReply,
     moveCount: sessionAfterMove.moveCount
+  };
+}
+
+async function runPvpRecentRepeatFlow() {
+  const channelId = "test-pvp-recent-room";
+  disableRoom(channelId);
+  stopSession(channelId);
+  enableRoom(channelId, {
+    guildId: "guild-4",
+    channelName: "pvp-recent-room",
+    mode: "pvp",
+    createdByUserId: "admin",
+    createdByUsername: "Admin"
+  });
+
+  const channel = new FakeChannel(channelId, "pvp-recent-room");
+  const loopPair = findLoopPair();
+
+  const startResult = await handleWordChainMessage(createMessage(channel, "guild-4", loopPair.opening, "u8", "Hana"));
+  if (!startResult?.ok) {
+    throw new Error("PvP recent-repeat start failed");
+  }
+
+  const firstReply = await handleWordChainMessage(createMessage(channel, "guild-4", loopPair.reply, "u9", "Ivan"));
+  if (!firstReply?.ok) {
+    throw new Error("PvP recent-repeat first reply failed");
+  }
+
+  const repeatedResult = await handleWordChainMessage(createMessage(channel, "guild-4", loopPair.opening, "u8", "Hana"));
+  if (repeatedResult?.ok || !repeatedResult?.reply?.includes("Bạn có thể dùng lại sau")) {
+    throw new Error("PvP recent-repeat warning did not return expected message");
+  }
+
+  stopSession(channelId);
+  disableRoom(channelId);
+  return {
+    repeatedPhrase: loopPair.opening,
+    warningShown: true
   };
 }
 
@@ -181,6 +263,9 @@ async function runPveFlow() {
   if (!playResult?.ok) {
     throw new Error(`PvE valid move rejected: ${validReply}`);
   }
+  if (playResult.react !== "success") {
+    throw new Error("PvE accepted move should request a success reaction");
+  }
 
   const sessionAfterBot = getSessionStatus(channelId);
   if (!sessionAfterBot || sessionAfterBot.moveCount < 2) {
@@ -198,6 +283,7 @@ async function runPveFlow() {
 
 async function main() {
   const pvp = await runPvpFlow();
+  const pvpRecentRepeat = await runPvpRecentRepeatFlow();
   const pvpRoundWin = await runPvpRoundWinFlow();
   const pve = await runPveFlow();
 
@@ -206,6 +292,7 @@ async function main() {
       {
         ok: true,
         pvp,
+        pvpRecentRepeat,
         pvpRoundWin,
         pve
       },

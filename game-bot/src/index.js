@@ -120,12 +120,13 @@ client.on(Events.MessageCreate, async (message) => {
     return;
   }
 
-  if (!result.skipReaction) {
-    if (result.ok) {
-      await message.react("✅").catch(() => {});
-    } else {
-      await message.react("❌").catch(() => {});
-    }
+  const reaction =
+    result.react || (result.skipReaction ? null : result.ok ? "success" : "failure");
+
+  if (reaction === "success") {
+    await message.react("✅").catch(() => {});
+  } else if (reaction === "failure") {
+    await message.react("❌").catch(() => {});
   }
 
   if (result.reply && !result.silent) {

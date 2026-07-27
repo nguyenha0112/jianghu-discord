@@ -8,8 +8,9 @@ const { getRoom, isEnabledRoom } = require("../storage/word-chain-room-store");
 const sessions = new Map();
 const recentHistoryByGuild = new Map();
 
-const MAX_RECENT_WORDS = 50;
+const MAX_RECENT_WORDS = 30;
 const TURN_TIMEOUT_MS = 30_000;
+const MIN_BOT_REPLY_SCORE = 1;
 const MIN_VALID_PLAYERS_FOR_REWARD = 2;
 const MIN_SCORE_FOR_PARTICIPATION_REWARD = 3;
 const PARTICIPATION_REWARD_XU = 10;
@@ -115,6 +116,10 @@ function findRecentUsage(guildId, phrase) {
     index,
     remainingTurns: MAX_RECENT_WORDS - index
   };
+}
+
+function getRecentReuseMessage(phrase, usage) {
+  return `Cụm **${phrase}** đã được dùng trong ${MAX_RECENT_WORDS} lượt gần đây. Bạn có thể dùng lại sau **${usage.remainingTurns}** lượt nữa.`;
 }
 
 function buildScoreboard(scores) {
@@ -278,6 +283,7 @@ function scheduleTurnTimeout(session, channel) {
       accent: 0xe74c3c,
       lastMoveLine: "Đã hết 30 giây mà chưa có câu trả lời hợp lệ. Ván đã tự tạm dừng, gõ `!play` để tiếp tục."
     }).catch(() => {});
+    await channel.send("Hết 30 giây mà chưa có câu trả lời hợp lệ. Ván đã tự tạm dừng, gõ `!play` để chơi tiếp.").catch(() => {});
   }, TURN_TIMEOUT_MS);
 }
 
@@ -316,6 +322,7 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
   };
 
   sessions.set(channelId, session);
+  pushRecentPhrase(guildId, seed);
   return session;
 }
 
@@ -331,6 +338,7 @@ function resetSessionForNextRound(session, nextSeed) {
   session.roundUsed = new Set([seed]);
   session.currentStreak = 0;
   session.turnDeadlineAt = Date.now() + TURN_TIMEOUT_MS;
+  pushRecentPhrase(session.guildId, seed);
 }
 
 function stopSession(channelId) {
@@ -438,23 +446,44 @@ function validatePhrase(session, guildId, phrase) {
   const tokens = splitTokens(normalized);
 
   if (tokens.length !== 2) {
-    return { ok: false, reason: "not_two_words" };
+    return {
+      ok: false,
+      reason: "not_two_words",
+      reply: "Chỉ nhận cụm 2 tiếng có nghĩa. Ví dụ: `hy vọng`, `bình yên`, `quê nhà`."
+    };
   }
 
   if (!isMeaningfulPhrase(normalized)) {
-    return { ok: false, reason: "not_meaningful" };
+    return {
+      ok: false,
+      reason: "not_meaningful",
+      reply: `Cụm **${normalized || phrase}** chưa có trong bộ từ điển nối từ.`
+    };
   }
 
   if (getFirstToken(normalized) !== session.requiredToken) {
-    return { ok: false, reason: "wrong_prefix" };
+    return {
+      ok: false,
+      reason: "wrong_prefix",
+      reply: `Hiện tại phải nối bằng từ **${session.requiredToken}**.`
+    };
+  }
+
+  const recentUsage = findRecentUsage(guildId, normalized);
+  if (recentUsage) {
+    return {
+      ok: false,
+      reason: "used_recently",
+      reply: getRecentReuseMessage(normalized, recentUsage)
+    };
   }
 
   if (session.roundUsed.has(normalized)) {
-    return { ok: false, reason: "used_in_round" };
-  }
-
-  if (findRecentUsage(guildId, normalized)) {
-    return { ok: false, reason: "used_recently" };
+    return {
+      ok: false,
+      reason: "used_in_round",
+      reply: `Cụm **${normalized}** đã xuất hiện trong ván này rồi, hãy đổi sang cụm khác.`
+    };
   }
 
   return { ok: true, normalized };
@@ -499,7 +528,18 @@ function chooseBotReply(session) {
     return bScore - aScore || a.localeCompare(b, "vi");
   });
 
-  return candidates[0];
+  const bestCandidate = candidates[0];
+  const bestLastToken = getLastToken(bestCandidate);
+  const bestScore =
+    countAvailableFollowups(bestLastToken, session, bestCandidate) +
+    (customPhraseSet.has(bestCandidate) ? 20 : 0) +
+    (HARD_ENDING_TOKENS.has(bestLastToken) ? -30 : 0);
+
+  if (bestScore < MIN_BOT_REPLY_SCORE) {
+    return null;
+  }
+
+  return bestCandidate;
 }
 
 function findPlayablePhraseForToken(requiredToken, guildId, excludedPhrases = []) {
@@ -597,7 +637,11 @@ async function processPvpPhrase({ guildId, channel, userId, username, phrase }) 
 
   const validation = validatePhrase(session, guildId, phrase);
   if (!validation.ok) {
-    return { ok: false, silent: true };
+    return {
+      ok: false,
+      silent: validation.reason !== "used_recently",
+      reply: validation.reply
+    };
   }
 
   await applyAcceptedPhrase({
@@ -614,7 +658,7 @@ async function processPvpPhrase({ guildId, channel, userId, username, phrase }) 
     return {
       ok: true,
       silent: false,
-      skipReaction: true,
+      react: "success",
       reply: `Không còn từ để nối tiếp. <@${userId}> thắng lượt này.`
     };
   }
@@ -634,7 +678,11 @@ async function processPvePhrase({ guildId, channel, userId, username, phrase }) 
 
   const validation = validatePhrase(session, guildId, phrase);
   if (!validation.ok) {
-    return { ok: false, silent: true };
+    return {
+      ok: false,
+      silent: validation.reason !== "used_recently",
+      reply: validation.reply
+    };
   }
 
   await applyAcceptedPhrase({
@@ -652,7 +700,7 @@ async function processPvePhrase({ guildId, channel, userId, username, phrase }) 
     return {
       ok: true,
       silent: false,
-      skipReaction: true,
+      react: "success",
       reply: "Bot không tìm được câu để nối tiếp. Bạn thắng lượt này."
     };
   }
@@ -669,7 +717,7 @@ async function processPvePhrase({ guildId, channel, userId, username, phrase }) 
   return {
     ok: true,
     silent: false,
-    skipReaction: true,
+    react: "success",
     reply: `${BOT_PVE_NAME} nối tiếp bằng **${botReply}**.`
   };
 }
