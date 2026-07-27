@@ -1,0 +1,17 @@
+{
+  "name": "jianghu-game-bot",
+  "version": "0.1.0",
+  "description": "Jianghu Discord game bot foundation",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/register-commands.js",
+    "check": "node --check src/index.js",
+    "check:register": "node --check src/register-commands.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.26.0",
+    "dotenv": "^16.6.1"
+  }
+}

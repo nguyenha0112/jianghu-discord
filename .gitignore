@@ -32,3 +32,5 @@ Thumbs.db
 # Local bot runtime artifacts
 chat-bot/audio/
 chat-bot/.env
+game-bot/.env
+game-bot/data/

@@ -14,9 +14,6 @@ jobs:
   bot-check:
     name: Bot Syntax Check
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: chat-bot
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,11 +23,25 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Install chat-bot dependencies
+        working-directory: chat-bot
         run: npm install
 
-      - name: Run syntax check
+      - name: Check chat-bot
+        working-directory: chat-bot
         run: npm run check
+
+      - name: Install game-bot dependencies
+        working-directory: game-bot
+        run: npm install
+
+      - name: Check game-bot
+        working-directory: game-bot
+        run: npm run check
+
+      - name: Check game-bot register script
+        working-directory: game-bot
+        run: npm run check:register
 
   secret-scan:
     name: Secret Scan
