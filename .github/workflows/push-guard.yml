@@ -1,0 +1,34 @@
+name: Push Guard
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  file-policy:
+    name: Sensitive File Policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Block common sensitive files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env($|\.)|(^|/)id_rsa|(^|/)id_ed25519|\.pem$|\.p12$|\.key$|(^|/)credentials(\.json)?$'; then
+            echo "Sensitive file pattern detected in tracked files."
+            exit 1
+          fi
+
+      - name: Ensure env template exists instead of tracked env
+        shell: bash
+        run: |
+          test -f chat-bot/.env.example
