@@ -23,15 +23,27 @@ const seedPhrases = ["yêu thương", "bầu trời", "hy vọng", "bình yên",
 const START_KEYWORDS = new Set(["batdau", "choi", "play", "bat dau", "bắt đầu", "chơi thôi"]);
 const STOP_KEYWORDS = new Set(["stop", "!stop"]);
 const PLAY_KEYWORDS = new Set(["play", "!play"]);
+const HARD_ENDING_TOKENS = new Set(["vọng", "nguyệt", "rớt", "rịt", "quí", "chiều", "thanh", "ác"]);
 
-const validPhraseSet = loadValidPhraseSet();
+const phraseCatalog = loadPhraseCatalog();
+const validPhraseSet = new Set(phraseCatalog.allPhrases);
+const customPhraseSet = new Set(phraseCatalog.customPhrases);
 
-function loadValidPhraseSet() {
+function loadPhraseCatalog() {
   try {
-    return new Set([...loadPhraseFile(PHRASE_DICTIONARY_PATH), ...loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH)]);
+    const basePhrases = loadPhraseFile(PHRASE_DICTIONARY_PATH);
+    const customPhrases = loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH);
+    return {
+      allPhrases: [...new Set([...basePhrases, ...customPhrases])],
+      customPhrases: [...new Set(customPhrases)]
+    };
   } catch (error) {
     console.error("Không thể tải từ điển nối từ:", error.message);
-    return new Set(seedPhrases.map((phrase) => normalizePhrase(phrase)));
+    const fallback = seedPhrases.map((phrase) => normalizePhrase(phrase));
+    return {
+      allPhrases: fallback,
+      customPhrases: fallback
+    };
   }
 }
 
@@ -112,8 +124,50 @@ function buildScoreboard(scores) {
     .map(([userId, score]) => `<@${userId}>: ${score}`);
 }
 
+function countAvailableFollowups(token, session, phraseToExclude = null) {
+  const normalizedToken = normalizePhrase(token);
+  let count = 0;
+
+  for (const phrase of validPhraseSet) {
+    if (getFirstToken(phrase) !== normalizedToken) {
+      continue;
+    }
+
+    if (session.roundUsed.has(phrase)) {
+      continue;
+    }
+
+    if (phraseToExclude && phrase === phraseToExclude) {
+      continue;
+    }
+
+    if (findRecentUsage(session.guildId, phrase)) {
+      continue;
+    }
+
+    count += 1;
+  }
+
+  return count;
+}
+
+function scoreSeedPhrase(phrase) {
+  const lastToken = getLastToken(phrase);
+  const branchScore = countAvailableFollowups(lastToken, {
+    guildId: "__seed__",
+    roundUsed: new Set([phrase])
+  });
+  const customBonus = customPhraseSet.has(phrase) ? 10 : 0;
+  const hardPenalty = HARD_ENDING_TOKENS.has(lastToken) ? -25 : 0;
+  return branchScore + customBonus + hardPenalty;
+}
+
 function pickSeedPhrase() {
-  return seedPhrases[Math.floor(Math.random() * seedPhrases.length)];
+  const ranked = [...seedPhrases]
+    .map((phrase) => normalizePhrase(phrase))
+    .sort((a, b) => scoreSeedPhrase(b) - scoreSeedPhrase(a) || a.localeCompare(b, "vi"));
+
+  return ranked[0] || normalizePhrase(seedPhrases[0]);
 }
 
 function getSession(channelId) {
@@ -182,7 +236,10 @@ function buildStatusEmbed(session, options = {}) {
       }
     )
     .setFooter({
-      text: "Sai chỉ bị đánh dấu reaction. Hết 30 giây mà không ai nối được thì ván sẽ tự dừng."
+      text:
+        session.mode === "pvp"
+          ? "Sai chỉ bị đánh dấu reaction. Hết đường nối, bot sẽ tự chốt người thắng và mở lượt mới."
+          : "Sai chỉ bị đánh dấu reaction. Bot sẽ ưu tiên các cụm tự nhiên hơn khi nối lại."
     });
 }
 
@@ -260,6 +317,20 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
 
   sessions.set(channelId, session);
   return session;
+}
+
+function resetSessionForNextRound(session, nextSeed) {
+  const seed = normalizePhrase(nextSeed || pickSeedPhrase());
+  session.seedPhrase = seed;
+  session.currentPhrase = seed;
+  session.requiredToken = getLastToken(seed);
+  session.paused = false;
+  session.moveCount = 0;
+  session.scores = new Map();
+  session.usernames = new Map();
+  session.roundUsed = new Set([seed]);
+  session.currentStreak = 0;
+  session.turnDeadlineAt = Date.now() + TURN_TIMEOUT_MS;
 }
 
 function stopSession(channelId) {
@@ -351,10 +422,7 @@ function getHelpText(session) {
 
 function buildRoomGuideText(mode = "pvp") {
   const modeLabel = mode === "pve" ? "PvE" : "PvP";
-  const modeText =
-    mode === "pve"
-      ? "Bạn sẽ nối từ trực tiếp với bot."
-      : "Mọi người trong phòng sẽ nối từ với nhau.";
+  const modeText = mode === "pve" ? "Bạn sẽ nối từ trực tiếp với bot." : "Mọi người trong phòng sẽ nối từ với nhau.";
 
   return [
     `**Phòng nối từ ${modeLabel} đã sẵn sàng.**`,
@@ -420,9 +488,15 @@ function chooseBotReply(session) {
   candidates.sort((a, b) => {
     const aLast = getLastToken(a);
     const bLast = getLastToken(b);
-    const aScore = aLast === session.requiredToken ? -10 : 0;
-    const bScore = bLast === session.requiredToken ? -10 : 0;
-    return aScore - bScore || a.localeCompare(b, "vi");
+    const aBranch = countAvailableFollowups(aLast, session, a);
+    const bBranch = countAvailableFollowups(bLast, session, b);
+    const aCustom = customPhraseSet.has(a) ? 20 : 0;
+    const bCustom = customPhraseSet.has(b) ? 20 : 0;
+    const aHardPenalty = HARD_ENDING_TOKENS.has(aLast) ? -30 : 0;
+    const bHardPenalty = HARD_ENDING_TOKENS.has(bLast) ? -30 : 0;
+    const aScore = aBranch + aCustom + aHardPenalty;
+    const bScore = bBranch + bCustom + bHardPenalty;
+    return bScore - aScore || a.localeCompare(b, "vi");
   });
 
   return candidates[0];
@@ -431,9 +505,10 @@ function chooseBotReply(session) {
 function findPlayablePhraseForToken(requiredToken, guildId, excludedPhrases = []) {
   const excluded = new Set(excludedPhrases.map((phrase) => normalizePhrase(phrase)));
   const history = getGuildHistory(guildId);
+  const normalizedToken = normalizePhrase(requiredToken);
 
   const candidates = [...validPhraseSet].filter((phrase) => {
-    if (getFirstToken(phrase) !== normalizePhrase(requiredToken)) {
+    if (getFirstToken(phrase) !== normalizedToken) {
       return false;
     }
 
@@ -450,6 +525,35 @@ function findPlayablePhraseForToken(requiredToken, guildId, excludedPhrases = []
 
   candidates.sort((a, b) => a.localeCompare(b, "vi"));
   return candidates[0] || null;
+}
+
+function findDeadEndPhraseForSession(session, token) {
+  const normalizedToken = normalizePhrase(token);
+  const candidates = [...validPhraseSet].filter((phrase) => {
+    if (getFirstToken(phrase) !== normalizedToken) {
+      return false;
+    }
+
+    if (session.roundUsed.has(phrase)) {
+      return false;
+    }
+
+    if (findRecentUsage(session.guildId, phrase)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  for (const phrase of candidates) {
+    const nextToken = getLastToken(phrase);
+    const followups = countAvailableFollowups(nextToken, session, phrase);
+    if (followups === 0) {
+      return phrase;
+    }
+  }
+
+  return null;
 }
 
 async function applyAcceptedPhrase({ session, channel, userId, username, phrase, actorLabel }) {
@@ -469,6 +573,15 @@ async function applyAcceptedPhrase({ session, channel, userId, username, phrase,
   await sendOrRefreshStatusMessage(channel, session, {
     accent: 0x2ecc71,
     lastMoveLine: `${actorLabel} trả lời đúng với **${phrase}**. Chuỗi hiện tại: **${session.currentStreak}**`
+  });
+}
+
+async function startNextRound(session, channel, introLine) {
+  resetSessionForNextRound(session, pickSeedPhrase());
+  scheduleTurnTimeout(session, channel);
+  await sendOrRefreshStatusMessage(channel, session, {
+    accent: 0x3498db,
+    lastMoveLine: `${introLine}\nLượt mới bắt đầu với từ **${session.currentPhrase}**.`
   });
 }
 
@@ -495,6 +608,16 @@ async function processPvpPhrase({ guildId, channel, userId, username, phrase }) 
     phrase: validation.normalized,
     actorLabel: `<@${userId}>`
   });
+
+  if (listCandidateReplies(session).length === 0) {
+    await startNextRound(session, channel, `<@${userId}> đã chặn được lượt này và thắng vòng hiện tại.`);
+    return {
+      ok: true,
+      silent: false,
+      skipReaction: true,
+      reply: `Không còn từ để nối tiếp. <@${userId}> thắng lượt này.`
+    };
+  }
 
   return { ok: true, silent: true, session };
 }
@@ -525,13 +648,7 @@ async function processPvePhrase({ guildId, channel, userId, username, phrase }) 
 
   const botReply = chooseBotReply(session);
   if (!botReply) {
-    session.paused = true;
-    clearSessionTimer(session);
-    await sendOrRefreshStatusMessage(channel, session, {
-      accent: 0x9b59b6,
-      lastMoveLine: `<@${userId}> đã đẩy bot vào thế bí. Bot không tìm được câu hợp lệ tiếp theo.`
-    });
-
+    await startNextRound(session, channel, `<@${userId}> đã đẩy bot vào thế bí và thắng lượt này.`);
     return {
       ok: true,
       silent: false,
@@ -722,5 +839,7 @@ module.exports = {
   buildRoomGuideText,
   getRoomMode,
   chooseBotReply,
-  findPlayablePhraseForToken
+  findPlayablePhraseForToken,
+  countAvailableFollowups,
+  findDeadEndPhraseForSession
 };

@@ -101,6 +101,57 @@ async function runPvpFlow() {
   };
 }
 
+async function runPvpRoundWinFlow() {
+  const channelId = "test-pvp-win-room";
+  disableRoom(channelId);
+  stopSession(channelId);
+  enableRoom(channelId, {
+    guildId: "guild-3",
+    channelName: "pvp-win-room",
+    mode: "pvp",
+    createdByUserId: "admin",
+    createdByUsername: "Admin"
+  });
+
+  const channel = new FakeChannel(channelId, "pvp-win-room");
+
+  const startPhrase = "á châu";
+  const startResult = await handleWordChainMessage(createMessage(channel, "guild-3", startPhrase, "u4", "Dora"));
+  if (!startResult?.ok) {
+    throw new Error("PvP win-flow start failed");
+  }
+
+  const sessionAfterStart = getSessionStatus(channelId);
+  if (sessionAfterStart.requiredToken !== "châu") {
+    throw new Error(`PvP win-flow started with unexpected token: ${sessionAfterStart.requiredToken}`);
+  }
+
+  const winningReply = "châu chấu";
+  const beforeCurrentPhrase = sessionAfterStart.currentPhrase;
+  const playResult = await handleWordChainMessage(createMessage(channel, "guild-3", winningReply, "u5", "Erin"));
+  if (!playResult?.ok) {
+    throw new Error(`PvP winning move rejected: ${winningReply}`);
+  }
+
+  const sessionAfterMove = getSessionStatus(channelId);
+  const restarted = sessionAfterMove.currentPhrase !== normalizeForTest(beforeCurrentPhrase) && sessionAfterMove.moveCount === 0;
+
+  if (!restarted) {
+    throw new Error("PvP auto-next-round did not restart after dead-end phrase");
+  }
+
+  stopSession(channelId);
+  disableRoom(channelId);
+  return {
+    winningReply,
+    restarted
+  };
+}
+
+function normalizeForTest(input) {
+  return (input || "").toLowerCase().normalize("NFC");
+}
+
 async function runPveFlow() {
   const channelId = "test-pve-room";
   disableRoom(channelId);
@@ -147,6 +198,7 @@ async function runPveFlow() {
 
 async function main() {
   const pvp = await runPvpFlow();
+  const pvpRoundWin = await runPvpRoundWinFlow();
   const pve = await runPveFlow();
 
   console.log(
@@ -154,12 +206,15 @@ async function main() {
       {
         ok: true,
         pvp,
+        pvpRoundWin,
         pve
       },
       null,
       2
     )
   );
+
+  process.exit(0);
 }
 
 main().catch((error) => {
