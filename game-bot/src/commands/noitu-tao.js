@@ -1,5 +1,10 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { getHelpText, sendOrRefreshStatusMessage, startSession } = require("../services/word-chain-service");
+const {
+  getHelpText,
+  scheduleTurnTimeout,
+  sendOrRefreshStatusMessage,
+  startSession
+} = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -24,6 +29,7 @@ module.exports = {
       });
 
       await interaction.reply(`Đã tạo ván nối từ mới.\n${getHelpText(session)}`);
+      scheduleTurnTimeout(session, interaction.channel);
       await sendOrRefreshStatusMessage(interaction.channel, session, {
         title: "Nối Từ PvP",
         accent: 0x3498db,

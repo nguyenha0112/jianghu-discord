@@ -9,6 +9,7 @@ const sessions = new Map();
 const recentHistoryByGuild = new Map();
 
 const MAX_RECENT_WORDS = 50;
+const TURN_TIMEOUT_MS = 30_000;
 const MIN_VALID_PLAYERS_FOR_REWARD = 2;
 const MIN_SCORE_FOR_PARTICIPATION_REWARD = 3;
 const PARTICIPATION_REWARD_XU = 10;
@@ -28,26 +29,13 @@ const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(
   "custom-vietnamese-phrases.txt"
 );
 
-const seedPhrases = [
-  "yêu thương",
-  "bầu trời",
-  "hy vọng",
-  "bình yên",
-  "quê nhà",
-  "hoa hồng",
-  "gia đình",
-  "niềm vui"
-];
+const seedPhrases = ["yêu thương", "bầu trời", "hy vọng", "bình yên", "quê nhà", "hoa hồng", "gia đình", "niềm vui"];
 
 const validPhraseSet = loadValidPhraseSet();
 
 function loadValidPhraseSet() {
   try {
-    const phrases = [
-      ...loadPhraseFile(PHRASE_DICTIONARY_PATH),
-      ...loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH)
-    ];
-
+    const phrases = [...loadPhraseFile(PHRASE_DICTIONARY_PATH), ...loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH)];
     return new Set(phrases);
   } catch (error) {
     console.error("Không thể tải từ điển nối từ:", error.message);
@@ -111,7 +99,6 @@ function getGuildHistory(guildId) {
 function pushRecentPhrase(guildId, phrase) {
   const history = getGuildHistory(guildId);
   history.unshift(phrase);
-
   if (history.length > MAX_RECENT_WORDS) {
     history.length = MAX_RECENT_WORDS;
   }
@@ -120,7 +107,6 @@ function pushRecentPhrase(guildId, phrase) {
 function findRecentUsage(guildId, phrase) {
   const history = getGuildHistory(guildId);
   const index = history.findIndex((entry) => entry === phrase);
-
   if (index === -1) {
     return null;
   }
@@ -145,11 +131,24 @@ function getSession(channelId) {
   return sessions.get(channelId) || null;
 }
 
+function getSecondsLeft(session) {
+  const msLeft = Math.max(0, session.turnDeadlineAt - Date.now());
+  return Math.ceil(msLeft / 1000);
+}
+
+function clearSessionTimer(session) {
+  if (session.turnTimer) {
+    clearTimeout(session.turnTimer);
+    session.turnTimer = null;
+  }
+}
+
 function buildStatusEmbed(session, options = {}) {
   const scoreboard = buildScoreboard(session.scores);
   const lastMoveLine = options.lastMoveLine || "Chưa có lượt hợp lệ nào.";
   const title = options.title || "Nối Từ PvP";
   const accent = options.accent || 0x2ecc71;
+  const timerText = session.paused ? "Đang dừng" : `${getSecondsLeft(session)} giây`;
 
   return new EmbedBuilder()
     .setColor(accent)
@@ -158,7 +157,8 @@ function buildStatusEmbed(session, options = {}) {
       [
         `**Từ hiện tại:** ${session.currentPhrase}`,
         `**Từ cần nối:** ${session.requiredToken}`,
-        `**Trạng thái:** ${session.paused ? "Tạm dừng" : "Đang chơi"}`
+        `**Trạng thái:** ${session.paused ? "Tạm dừng" : "Đang chơi"}`,
+        `**Thời gian còn lại:** ${timerText}`
       ].join("\n")
     )
     .addFields(
@@ -179,7 +179,7 @@ function buildStatusEmbed(session, options = {}) {
       }
     )
     .setFooter({
-      text: "Bot chỉ thả reaction khi người chơi trả lời. Phần thưởng được phát khi kết thúc ván."
+      text: "Sai chỉ bị đánh dấu reaction. Hết 30 giây mà không ai nối được thì ván sẽ tự dừng."
     });
 }
 
@@ -203,6 +203,25 @@ async function sendOrRefreshStatusMessage(channel, session, options = {}) {
   }
 }
 
+function scheduleTurnTimeout(session, channel) {
+  clearSessionTimer(session);
+  session.turnDeadlineAt = Date.now() + TURN_TIMEOUT_MS;
+
+  session.turnTimer = setTimeout(async () => {
+    const activeSession = sessions.get(session.channelId);
+    if (!activeSession || activeSession.paused) {
+      return;
+    }
+
+    activeSession.paused = true;
+    await sendOrRefreshStatusMessage(channel, activeSession, {
+      title: "Nối Từ PvP",
+      accent: 0xe74c3c,
+      lastMoveLine: "Đã hết 30 giây mà chưa có câu trả lời hợp lệ. Ván đã tự tạm dừng, gõ `!play` để tiếp tục."
+    }).catch(() => {});
+  }, TURN_TIMEOUT_MS);
+}
+
 function startSession({ guildId, channelId, channelName, hostUserId, hostUsername, seedPhrase }) {
   if (!isEnabledRoom(channelId)) {
     throw new Error("Phòng này chưa được cấu hình để chơi nối từ. Hãy dùng `/noitu-tao-phong` trước.");
@@ -213,8 +232,6 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
     throw new Error("Cụm mở đầu phải là một cụm 2 tiếng có nghĩa trong từ điển nối từ.");
   }
 
-  const lastToken = getLastToken(seed);
-
   const session = {
     guildId,
     channelId,
@@ -223,7 +240,7 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
     hostUsername,
     seedPhrase: seed,
     currentPhrase: seed,
-    requiredToken: lastToken,
+    requiredToken: getLastToken(seed),
     active: true,
     paused: false,
     createdAt: new Date().toISOString(),
@@ -232,7 +249,9 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
     usernames: new Map([[hostUserId, hostUsername]]),
     roundUsed: new Set([seed]),
     statusMessageId: null,
-    currentStreak: 0
+    currentStreak: 0,
+    turnDeadlineAt: Date.now() + TURN_TIMEOUT_MS,
+    turnTimer: null
   };
 
   sessions.set(channelId, session);
@@ -245,6 +264,7 @@ function stopSession(channelId) {
     return null;
   }
 
+  clearSessionTimer(session);
   sessions.delete(channelId);
   return session;
 }
@@ -256,6 +276,7 @@ function pauseSession(channelId) {
   }
 
   session.paused = true;
+  clearSessionTimer(session);
   return session;
 }
 
@@ -266,6 +287,7 @@ function resumeSession(channelId) {
   }
 
   session.paused = false;
+  session.turnDeadlineAt = Date.now() + TURN_TIMEOUT_MS;
   return session;
 }
 
@@ -317,7 +339,7 @@ function getHelpText(session) {
     `Từ hiện tại: ${session.currentPhrase}`,
     `Từ cần nối: ${session.requiredToken}`,
     "Luật: chỉ nhận cụm 2 tiếng có nghĩa.",
-    "Người chơi chỉ cần nhắn trực tiếp trong phòng."
+    "Mỗi lượt có 30 giây để trả lời."
   ].join("\n");
 }
 
@@ -342,8 +364,7 @@ async function processPhrase({ guildId, channel, userId, username, phrase }) {
     return { ok: false, silent: true };
   }
 
-  const firstToken = getFirstToken(normalized);
-  if (firstToken !== session.requiredToken) {
+  if (getFirstToken(normalized) !== session.requiredToken) {
     return { ok: false, silent: true };
   }
 
@@ -351,8 +372,7 @@ async function processPhrase({ guildId, channel, userId, username, phrase }) {
     return { ok: false, silent: true };
   }
 
-  const recentUsage = findRecentUsage(guildId, normalized);
-  if (recentUsage) {
+  if (findRecentUsage(guildId, normalized)) {
     return { ok: false, silent: true };
   }
 
@@ -368,6 +388,7 @@ async function processPhrase({ guildId, channel, userId, username, phrase }) {
   session.usernames.set(userId, username);
   pushRecentPhrase(session.guildId, normalized);
 
+  scheduleTurnTimeout(session, channel);
   await sendOrRefreshStatusMessage(channel, session, {
     title: "Nối Từ PvP",
     accent: 0x2ecc71,
@@ -448,11 +469,11 @@ async function handleWordChainMessage(message) {
   const lowered = raw.toLowerCase();
 
   if (lowered === "!stop") {
-    pauseSession(message.channel.id);
-    await sendOrRefreshStatusMessage(message.channel, session, {
+    const pausedSession = pauseSession(message.channel.id);
+    await sendOrRefreshStatusMessage(message.channel, pausedSession, {
       title: "Nối Từ PvP",
       accent: 0xf39c12,
-      lastMoveLine: "Ván chơi đang tạm dừng."
+      lastMoveLine: `Ván chơi đã được tạm dừng bởi <@${message.author.id}>.`
     });
     return {
       ok: true,
@@ -462,10 +483,11 @@ async function handleWordChainMessage(message) {
 
   if (lowered === "!play") {
     const resumed = resumeSession(message.channel.id);
+    scheduleTurnTimeout(resumed, message.channel);
     await sendOrRefreshStatusMessage(message.channel, resumed, {
       title: "Nối Từ PvP",
       accent: 0x3498db,
-      lastMoveLine: "Ván chơi đã tiếp tục."
+      lastMoveLine: `Ván chơi đã tiếp tục bởi <@${message.author.id}>.`
     });
     return {
       ok: true,
@@ -495,5 +517,6 @@ module.exports = {
   distributeFinalRewards,
   isMeaningfulPhrase,
   sendOrRefreshStatusMessage,
-  buildStatusEmbed
+  buildStatusEmbed,
+  scheduleTurnTimeout
 };
