@@ -3,6 +3,7 @@ require("dotenv").config();
 const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
+const { handleWordChainMessage } = require("./services/word-chain-service");
 
 const token = process.env.DISCORD_TOKEN;
 
@@ -12,7 +13,11 @@ if (!token) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
 client.commands = new Collection();
@@ -59,6 +64,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.reply(payload).catch(() => {});
     }
   }
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot || !message.guild) {
+    return;
+  }
+
+  const result = await handleWordChainMessage(message);
+  if (!result) {
+    return;
+  }
+
+  await message.reply(result.reply).catch(() => {});
 });
 
 client.login(token);

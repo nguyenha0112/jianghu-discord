@@ -70,6 +70,21 @@ const commandBuilders = [
         .setRequired(false)
     ),
   new SlashCommandBuilder()
+    .setName("noitu-tao")
+    .setDescription("Tao mot van noi tu trong channel hien tai.")
+    .addStringOption((option) =>
+      option
+        .setName("tu_goi_y")
+        .setDescription("Cum tu mo dau neu ban muon tu chon")
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("noitu-trangthai")
+    .setDescription("Xem trang thai van noi tu hien tai."),
+  new SlashCommandBuilder()
+    .setName("noitu-dung")
+    .setDescription("Dung van noi tu hien tai."),
+  new SlashCommandBuilder()
     .setName("admin-player")
     .setDescription("Xem thong tin chi tiet cua mot player.")
     .addStringOption((option) =>
