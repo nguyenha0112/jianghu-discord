@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { EmbedBuilder } = require("discord.js");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/word-chain-room-store");
@@ -27,7 +28,16 @@ const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(
   "custom-vietnamese-phrases.txt"
 );
 
-const seedPhrases = ["mặt trời", "mưa thu", "bóng đêm", "thiên hạ", "hồng nhan", "giang hồ"];
+const seedPhrases = [
+  "yêu thương",
+  "bầu trời",
+  "hy vọng",
+  "bình yên",
+  "quê nhà",
+  "hoa hồng",
+  "gia đình",
+  "niềm vui"
+];
 
 const validPhraseSet = loadValidPhraseSet();
 
@@ -55,15 +65,7 @@ function loadPhraseFile(filePath) {
     .split(/\r?\n/u)
     .map((line) => normalizePhrase(line))
     .filter(Boolean)
-    .filter((phrase) => {
-      const tokens = phrase.split(" ").filter(Boolean);
-      if (tokens.length < 2 || tokens.length > 5) {
-        return false;
-      }
-
-      const singleCharacterTokens = tokens.filter((token) => token.length === 1).length;
-      return singleCharacterTokens < tokens.length;
-    });
+    .filter((phrase) => splitTokens(phrase).length === 2);
 }
 
 function normalizePhrase(input) {
@@ -95,17 +97,7 @@ function isMeaningfulPhrase(phrase) {
     return false;
   }
 
-  const tokens = splitTokens(normalized);
-  if (tokens.length < 2 || tokens.length > 5) {
-    return false;
-  }
-
-  const singleCharacterTokens = tokens.filter((token) => token.length === 1).length;
-  if (singleCharacterTokens >= tokens.length) {
-    return false;
-  }
-
-  return validPhraseSet.has(normalized);
+  return splitTokens(normalized).length === 2 && validPhraseSet.has(normalized);
 }
 
 function getGuildHistory(guildId) {
@@ -153,6 +145,64 @@ function getSession(channelId) {
   return sessions.get(channelId) || null;
 }
 
+function buildStatusEmbed(session, options = {}) {
+  const scoreboard = buildScoreboard(session.scores);
+  const lastMoveLine = options.lastMoveLine || "Chưa có lượt hợp lệ nào.";
+  const title = options.title || "Nối Từ PvP";
+  const accent = options.accent || 0x2ecc71;
+
+  return new EmbedBuilder()
+    .setColor(accent)
+    .setTitle(title)
+    .setDescription(
+      [
+        `**Từ hiện tại:** ${session.currentPhrase}`,
+        `**Từ cần nối:** ${session.requiredToken}`,
+        `**Trạng thái:** ${session.paused ? "Tạm dừng" : "Đang chơi"}`
+      ].join("\n")
+    )
+    .addFields(
+      {
+        name: "Hướng dẫn nhanh",
+        value: "Người chơi nhập **cụm 2 tiếng có nghĩa**. Dùng `!stop` để tạm dừng, `!play` để tiếp tục.",
+        inline: false
+      },
+      {
+        name: "Lượt gần nhất",
+        value: lastMoveLine,
+        inline: false
+      },
+      {
+        name: "Bảng điểm",
+        value: scoreboard.length > 0 ? scoreboard.join("\n") : "Chưa có điểm.",
+        inline: false
+      }
+    )
+    .setFooter({
+      text: "Bot chỉ thả reaction khi người chơi trả lời. Phần thưởng được phát khi kết thúc ván."
+    });
+}
+
+async function sendOrRefreshStatusMessage(channel, session, options = {}) {
+  const embed = buildStatusEmbed(session, options);
+
+  if (!session.statusMessageId) {
+    const sentMessage = await channel.send({ embeds: [embed] });
+    session.statusMessageId = sentMessage.id;
+    return sentMessage;
+  }
+
+  try {
+    const message = await channel.messages.fetch(session.statusMessageId);
+    await message.edit({ embeds: [embed] });
+    return message;
+  } catch (error) {
+    const sentMessage = await channel.send({ embeds: [embed] });
+    session.statusMessageId = sentMessage.id;
+    return sentMessage;
+  }
+}
+
 function startSession({ guildId, channelId, channelName, hostUserId, hostUsername, seedPhrase }) {
   if (!isEnabledRoom(channelId)) {
     throw new Error("Phòng này chưa được cấu hình để chơi nối từ. Hãy dùng `/noitu-tao-phong` trước.");
@@ -160,7 +210,7 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
 
   const seed = normalizePhrase(seedPhrase || pickSeedPhrase());
   if (!isMeaningfulPhrase(seed)) {
-    throw new Error("Cụm mở đầu không nằm trong từ điển nối từ hiện tại. Hãy dùng một cụm tiếng Việt có nghĩa.");
+    throw new Error("Cụm mở đầu phải là một cụm 2 tiếng có nghĩa trong từ điển nối từ.");
   }
 
   const lastToken = getLastToken(seed);
@@ -180,7 +230,9 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
     moveCount: 0,
     scores: new Map(),
     usernames: new Map([[hostUserId, hostUsername]]),
-    roundUsed: new Set([seed])
+    roundUsed: new Set([seed]),
+    statusMessageId: null,
+    currentStreak: 0
   };
 
   sessions.set(channelId, session);
@@ -262,66 +314,46 @@ async function rewardPlayer(userId, username, xuGain, type = "word_chain_reward"
 
 function getHelpText(session) {
   return [
-    `Cụm hiện tại: "${session.currentPhrase}"`,
-    `Từ cần nối tiếp: "${session.requiredToken}"`,
-    "Gõ cụm từ trực tiếp trong phòng để chơi.",
-    "Chỉ chấp nhận cụm tiếng Việt có nghĩa nằm trong từ điển nối từ hiện tại.",
-    "Dùng `!stop` để tạm dừng, `!play` để tiếp tục, `/noitu-dung` để kết thúc ván.",
-    "Thưởng Xu chỉ được phát khi kết thúc ván, không cộng Xu cho từng câu đúng."
+    `Từ hiện tại: ${session.currentPhrase}`,
+    `Từ cần nối: ${session.requiredToken}`,
+    "Luật: chỉ nhận cụm 2 tiếng có nghĩa.",
+    "Người chơi chỉ cần nhắn trực tiếp trong phòng."
   ].join("\n");
 }
 
-async function processPhrase({ guildId, channelId, userId, username, phrase }) {
-  const session = sessions.get(channelId);
+async function processPhrase({ guildId, channel, userId, username, phrase }) {
+  const session = sessions.get(channel.id);
   if (!session || !session.active) {
     return null;
   }
 
   if (session.paused) {
-    return {
-      ok: false,
-      reply: "Ván nối từ đang tạm dừng. Gõ `!play` để tiếp tục."
-    };
+    return { ok: false, silent: true };
   }
 
   const normalized = normalizePhrase(phrase);
   const tokens = splitTokens(normalized);
 
-  if (tokens.length < 2) {
-    return {
-      ok: false,
-      reply: "Cụm từ cần ít nhất 2 tiếng để chơi nối từ."
-    };
+  if (tokens.length !== 2) {
+    return { ok: false, silent: true };
   }
 
   if (!isMeaningfulPhrase(normalized)) {
-    return {
-      ok: false,
-      reply: "Cụm này không có trong từ điển nối từ hiện tại hoặc chưa đủ nghĩa. Hãy dùng một cụm tiếng Việt tự nhiên hơn."
-    };
+    return { ok: false, silent: true };
   }
 
   const firstToken = getFirstToken(normalized);
   if (firstToken !== session.requiredToken) {
-    return {
-      ok: false,
-      reply: `Cụm này chưa hợp lệ. Từ đầu tiên phải bắt đầu bằng "${session.requiredToken}".`
-    };
+    return { ok: false, silent: true };
   }
 
   if (session.roundUsed.has(normalized)) {
-    return {
-      ok: false,
-      reply: "Cụm từ này đã được dùng trong ván hiện tại."
-    };
+    return { ok: false, silent: true };
   }
 
   const recentUsage = findRecentUsage(guildId, normalized);
   if (recentUsage) {
-    return {
-      ok: false,
-      reply: `Từ này đã được sử dụng trong ${MAX_RECENT_WORDS} lượt gần đây. Bạn có thể dùng lại sau ${recentUsage.remainingTurns} lượt nữa.`
-    };
+    return { ok: false, silent: true };
   }
 
   const nextRequired = getLastToken(normalized);
@@ -330,17 +362,21 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   session.currentPhrase = normalized;
   session.requiredToken = nextRequired;
   session.moveCount += 1;
+  session.currentStreak += 1;
   session.roundUsed.add(normalized);
   session.scores.set(userId, nextScore);
   session.usernames.set(userId, username);
   pushRecentPhrase(session.guildId, normalized);
 
+  await sendOrRefreshStatusMessage(channel, session, {
+    title: "Nối Từ PvP",
+    accent: 0x2ecc71,
+    lastMoveLine: `<@${userId}> trả lời đúng với **${normalized}**. Chuỗi hiện tại: **${session.currentStreak}**`
+  });
+
   return {
     ok: true,
-    reply: [
-      `Hợp lệ. <@${userId}> hiện có ${nextScore} điểm trong ván này.`,
-      `Từ tiếp theo phải bắt đầu bằng "${nextRequired}".`
-    ].join("\n"),
+    silent: true,
     session
   };
 }
@@ -413,23 +449,33 @@ async function handleWordChainMessage(message) {
 
   if (lowered === "!stop") {
     pauseSession(message.channel.id);
+    await sendOrRefreshStatusMessage(message.channel, session, {
+      title: "Nối Từ PvP",
+      accent: 0xf39c12,
+      lastMoveLine: "Ván chơi đang tạm dừng."
+    });
     return {
       ok: true,
-      reply: "Đã tạm dừng ván nối từ trong phòng này. Gõ `!play` để chơi tiếp."
+      silent: true
     };
   }
 
   if (lowered === "!play") {
     const resumed = resumeSession(message.channel.id);
+    await sendOrRefreshStatusMessage(message.channel, resumed, {
+      title: "Nối Từ PvP",
+      accent: 0x3498db,
+      lastMoveLine: "Ván chơi đã tiếp tục."
+    });
     return {
       ok: true,
-      reply: `Đã tiếp tục ván nối từ.\n${getHelpText(resumed)}`
+      silent: true
     };
   }
 
   return processPhrase({
     guildId: message.guild.id,
-    channelId: message.channel.id,
+    channel: message.channel,
     userId: message.author.id,
     username: message.author.username,
     phrase: raw
@@ -447,5 +493,7 @@ module.exports = {
   handleWordChainMessage,
   normalizePhrase,
   distributeFinalRewards,
-  isMeaningfulPhrase
+  isMeaningfulPhrase,
+  sendOrRefreshStatusMessage,
+  buildStatusEmbed
 };

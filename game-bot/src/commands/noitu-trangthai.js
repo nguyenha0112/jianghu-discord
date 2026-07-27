@@ -1,5 +1,9 @@
-const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
-const { getRoomConfig, getSessionStatus } = require("../services/word-chain-service");
+const { SlashCommandBuilder } = require("discord.js");
+const {
+  buildStatusEmbed,
+  getRoomConfig,
+  getSessionStatus
+} = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,7 +17,6 @@ module.exports = {
     }
 
     const session = getSessionStatus(interaction.channelId);
-
     if (!session) {
       await interaction.reply(
         "Phòng này đã bật nối từ nhưng hiện chưa có ván nào đang chạy. Dùng `/noitu-tao` để bắt đầu."
@@ -21,26 +24,11 @@ module.exports = {
       return;
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("Trạng thái Nối Từ")
-      .addFields(
-        { name: "Chủ phòng", value: session.hostUsername, inline: true },
-        { name: "Trạng thái", value: session.paused ? "Đang tạm dừng" : "Đang chạy", inline: true },
-        { name: "Cụm từ hiện tại", value: session.currentPhrase, inline: false },
-        { name: "Từ cần nối tiếp", value: session.requiredToken, inline: true },
-        { name: "Số lượt hợp lệ", value: String(session.moveCount), inline: true },
-        {
-          name: "Bảng điểm",
-          value: session.scoreboard.length > 0 ? session.scoreboard.join("\n") : "Chưa có điểm.",
-          inline: false
-        },
-        {
-          name: "Cách chơi nhanh",
-          value:
-            "Gõ cụm từ trực tiếp trong phòng. Dùng `!stop` để tạm dừng, `!play` để tiếp tục. Chỉ các cụm tiếng Việt có nghĩa trong từ điển mới được tính.",
-          inline: false
-        }
-      );
+    const embed = buildStatusEmbed(session, {
+      title: "Nối Từ PvP",
+      accent: session.paused ? 0xf39c12 : 0x2ecc71,
+      lastMoveLine: "Đây là trạng thái hiện tại của ván."
+    });
 
     await interaction.reply({ embeds: [embed] });
   }

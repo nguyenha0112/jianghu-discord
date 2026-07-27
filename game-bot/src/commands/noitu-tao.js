@@ -1,14 +1,14 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { getHelpText, startSession } = require("../services/word-chain-service");
+const { getHelpText, sendOrRefreshStatusMessage, startSession } = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-tao")
-    .setDescription("Tạo một ván nối từ trong kênh hiện tại.")
+    .setDescription("Tạo một ván nối từ PvP trong kênh hiện tại.")
     .addStringOption((option) =>
       option
         .setName("tu_goi_y")
-        .setDescription("Cụm từ mở đầu nếu bạn muốn tự chọn")
+        .setDescription("Cụm mở đầu 2 tiếng nếu bạn muốn tự chọn")
         .setRequired(false)
     ),
   async execute(interaction) {
@@ -23,7 +23,12 @@ module.exports = {
         seedPhrase
       });
 
-      await interaction.reply(["Đã tạo ván nối từ mới.", getHelpText(session)].join("\n"));
+      await interaction.reply(`Đã tạo ván nối từ mới.\n${getHelpText(session)}`);
+      await sendOrRefreshStatusMessage(interaction.channel, session, {
+        title: "Nối Từ PvP",
+        accent: 0x3498db,
+        lastMoveLine: "Ván mới đã bắt đầu."
+      });
     } catch (error) {
       await interaction.reply({ content: error.message, ephemeral: true });
     }

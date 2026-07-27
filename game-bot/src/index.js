@@ -78,7 +78,9 @@ client.on(Events.MessageCreate, async (message) => {
     await message.react("❌").catch(() => {});
   }
 
-  await message.reply(result.reply).catch(() => {});
+  if (result.reply && !result.silent) {
+    await message.reply(result.reply).catch(() => {});
+  }
 });
 
 client.login(token);

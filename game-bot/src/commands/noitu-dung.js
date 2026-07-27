@@ -23,13 +23,33 @@ module.exports = {
 
     const rewardResult = await distributeFinalRewards(session);
 
-    await interaction.reply(
-      [
-        "Đã dừng ván nối từ.",
-        `Tổng số lượt hợp lệ: ${session.moveCount}`,
-        `Bảng điểm:\n${scoreboard}`,
-        `Thưởng cuối ván:\n${rewardResult.lines.join("\n")}`
-      ].join("\n")
-    );
+    await interaction.reply({
+      embeds: [
+        {
+          color: 0xe67e22,
+          title: "Kết thúc ván nối từ",
+          fields: [
+            {
+              name: "Tổng lượt hợp lệ",
+              value: String(session.moveCount),
+              inline: true
+            },
+            {
+              name: "Chuỗi hiện tại",
+              value: String(session.currentStreak),
+              inline: true
+            },
+            {
+              name: "Bảng điểm",
+              value: scoreboard
+            },
+            {
+              name: "Thưởng cuối ván",
+              value: rewardResult.lines.join("\n")
+            }
+          ]
+        }
+      ]
+    });
   }
 };
