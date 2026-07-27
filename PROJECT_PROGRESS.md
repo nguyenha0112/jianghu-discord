@@ -61,7 +61,7 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Shop va crafting MVP
 - [ ] Tool progression
 - [ ] Recipe balance
-- [ ] Admin economy log command
+- [x] Admin economy log command
 - [x] Ket noi Supabase project
 - [x] Test ket noi Supabase thanh cong
 - [x] Chuyen player va transaction storage sang Supabase

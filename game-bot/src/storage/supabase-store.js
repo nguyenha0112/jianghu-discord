@@ -232,10 +232,42 @@ async function appendTransaction(entry) {
   }
 }
 
+async function getRecentTransactions(userId, limit = 10) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  let query = supabase
+    .from("transactions")
+    .select("user_id, username, type, changes, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function deletePlayer(userId) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("players").delete().eq("user_id", userId);
+  if (error) {
+    throw error;
+  }
+}
+
 module.exports = {
   hasSupabaseConfig,
   ensurePlayer,
   getPlayer,
   updatePlayer,
-  appendTransaction
+  appendTransaction,
+  getRecentTransactions,
+  deletePlayer
 };
