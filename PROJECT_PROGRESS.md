@@ -63,7 +63,7 @@ Cap nhat lan cuoi: 2026-07-27
 - [ ] Tool progression
 - [ ] Recipe balance
 - [x] Admin economy log command
-- [ ] Noi tu reward balancing
+- [x] Noi tu reward balancing
 - [x] Ket noi Supabase project
 - [x] Test ket noi Supabase thanh cong
 - [x] Chuyen player va transaction storage sang Supabase

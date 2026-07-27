@@ -1,15 +1,15 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { stopSession } = require("../services/word-chain-service");
+const { distributeFinalRewards, stopSession } = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-dung")
-    .setDescription("Dừng ván nối từ hiện tại."),
+    .setDescription("Dung van noi tu hien tai."),
   async execute(interaction) {
     const session = stopSession(interaction.channelId);
 
     if (!session) {
-      await interaction.reply("Không có ván nối từ nào đang chạy để dừng.");
+      await interaction.reply("Khong co van noi tu nao dang chay de dung.");
       return;
     }
 
@@ -18,14 +18,17 @@ module.exports = {
         ? "Chua co ai ghi diem."
         : [...session.scores.entries()]
             .sort((a, b) => b[1] - a[1])
-            .map(([userId, score]) => `<@${userId}>: ${score}`)
+            .map(([userId, score], index) => `${index + 1}. <@${userId}>: ${score} diem`)
             .join("\n");
+
+    const rewardResult = await distributeFinalRewards(session);
 
     await interaction.reply(
       [
-        "Đã dừng ván nối từ.",
-        `Tổng số lượt hợp lệ: ${session.moveCount}`,
-        `Bảng điểm:\n${scoreboard}`
+        "Da dung van noi tu.",
+        `Tong so luot hop le: ${session.moveCount}`,
+        `Bang diem:\n${scoreboard}`,
+        `Thuong cuoi van:\n${rewardResult.lines.join("\n")}`
       ].join("\n")
     );
   }

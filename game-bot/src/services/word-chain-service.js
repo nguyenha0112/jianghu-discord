@@ -4,16 +4,20 @@ const { getRoom, isEnabledRoom } = require("../storage/word-chain-room-store");
 
 const sessions = new Map();
 const recentHistoryByGuild = new Map();
+
 const MAX_RECENT_WORDS = 50;
-const TURN_REWARD_XU = 10;
+const MIN_VALID_PLAYERS_FOR_REWARD = 2;
+const MIN_SCORE_FOR_PARTICIPATION_REWARD = 3;
+const PARTICIPATION_REWARD_XU = 10;
+const FINAL_RANK_REWARDS = [80, 40, 20];
 
 const seedPhrases = [
-  "giang hồ",
-  "mặt trời",
-  "mưa thu",
-  "bóng đêm",
-  "thiên hạ",
-  "hồng nhan"
+  "giang ho",
+  "mat troi",
+  "mua thu",
+  "bong dem",
+  "thien ha",
+  "hong nhan"
 ];
 
 function normalizePhrase(input) {
@@ -43,12 +47,14 @@ function getGuildHistory(guildId) {
   if (!recentHistoryByGuild.has(guildId)) {
     recentHistoryByGuild.set(guildId, []);
   }
+
   return recentHistoryByGuild.get(guildId);
 }
 
 function pushRecentPhrase(guildId, phrase) {
   const history = getGuildHistory(guildId);
   history.unshift(phrase);
+
   if (history.length > MAX_RECENT_WORDS) {
     history.length = MAX_RECENT_WORDS;
   }
@@ -57,6 +63,7 @@ function pushRecentPhrase(guildId, phrase) {
 function findRecentUsage(guildId, phrase) {
   const history = getGuildHistory(guildId);
   const index = history.findIndex((entry) => entry === phrase);
+
   if (index === -1) {
     return null;
   }
@@ -83,7 +90,7 @@ function getSession(channelId) {
 
 function startSession({ guildId, channelId, channelName, hostUserId, hostUsername, seedPhrase }) {
   if (!isEnabledRoom(channelId)) {
-    throw new Error("Phòng này chưa được cấu hình để chơi nối từ. Hãy dùng `/noitu-tao-phong` trước.");
+    throw new Error("Phong nay chua duoc cau hinh de choi noi tu. Hay dung /noitu-tao-phong truoc.");
   }
 
   const seed = normalizePhrase(seedPhrase || pickSeedPhrase());
@@ -103,6 +110,7 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
     createdAt: new Date().toISOString(),
     moveCount: 0,
     scores: new Map(),
+    usernames: new Map([[hostUserId, hostUsername]]),
     roundUsed: new Set([seed])
   };
 
@@ -156,7 +164,7 @@ function getRoomConfig(channelId) {
   return getRoom(channelId);
 }
 
-async function rewardPlayer(userId, username, xuGain) {
+async function rewardPlayer(userId, username, xuGain, type = "word_chain_reward") {
   await ensurePlayer(userId, username);
   const player = await getPlayer(userId);
   const nextStats = {
@@ -176,7 +184,7 @@ async function rewardPlayer(userId, username, xuGain) {
   appendTransaction({
     userId,
     username,
-    type: "word_chain_reward",
+    type,
     changes: {
       xu: xuGain
     }
@@ -185,10 +193,11 @@ async function rewardPlayer(userId, username, xuGain) {
 
 function getHelpText(session) {
   return [
-    `Cụm hiện tại: "${session.currentPhrase}"`,
-    `Từ cần nối tiếp: "${session.requiredToken}"`,
-    "Gõ cụm từ trực tiếp trong phòng để chơi.",
-    "Dùng `!stop` để tạm dừng, `!play` để tiếp tục, `/noitu-dừng` để kết thúc ván."
+    `Cum hien tai: "${session.currentPhrase}"`,
+    `Tu can noi tiep: "${session.requiredToken}"`,
+    "Go cum tu truc tiep trong phong de choi.",
+    "Dung !stop de tam dung, !play de tiep tuc, /noitu-dung de ket thuc van.",
+    "Thuong Xu chi duoc phat khi ket thuc van, khong cong Xu cho tung cau dung."
   ].join("\n");
 }
 
@@ -201,7 +210,7 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (session.paused) {
     return {
       ok: false,
-      reply: "Ván nối từ đang tạm dừng. Gõ `!play` để tiếp tục."
+      reply: "Van noi tu dang tam dung. Go !play de tiep tuc."
     };
   }
 
@@ -211,7 +220,7 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (tokens.length < 2) {
     return {
       ok: false,
-      reply: "Cụm từ cần ít nhất 2 tiếng để chơi nối từ."
+      reply: "Cum tu can it nhat 2 tieng de choi noi tu."
     };
   }
 
@@ -219,14 +228,14 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (firstToken !== session.requiredToken) {
     return {
       ok: false,
-      reply: `Cụm này chưa hợp lệ. Từ đầu tiên phải bắt đầu bằng "${session.requiredToken}".`
+      reply: `Cum nay chua hop le. Tu dau tien phai bat dau bang "${session.requiredToken}".`
     };
   }
 
   if (session.roundUsed.has(normalized)) {
     return {
       ok: false,
-      reply: "Cụm từ này đã được dùng trong ván hiện tại."
+      reply: "Cum tu nay da duoc dung trong van hien tai."
     };
   }
 
@@ -234,27 +243,81 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (recentUsage) {
     return {
       ok: false,
-      reply: `Từ này đã được sử dụng trong ${MAX_RECENT_WORDS} lượt gần đây. Bạn có thể dùng lại sau ${recentUsage.remainingTurns} lượt nữa.`
+      reply: `Tu nay da duoc su dung trong ${MAX_RECENT_WORDS} luot gan day. Ban co the dung lai sau ${recentUsage.remainingTurns} luot nua.`
     };
   }
 
   const nextRequired = getLastToken(normalized);
+  const nextScore = (session.scores.get(userId) || 0) + 1;
+
   session.currentPhrase = normalized;
   session.requiredToken = nextRequired;
   session.moveCount += 1;
   session.roundUsed.add(normalized);
-  session.scores.set(userId, (session.scores.get(userId) || 0) + 1);
+  session.scores.set(userId, nextScore);
+  session.usernames.set(userId, username);
   pushRecentPhrase(session.guildId, normalized);
-
-  await rewardPlayer(userId, username, TURN_REWARD_XU);
 
   return {
     ok: true,
     reply: [
-      `Hợp lệ. +${TURN_REWARD_XU} Xu cho <@${userId}>.`,
-      `Từ tiếp theo phải bắt đầu bằng "${nextRequired}".`
+      `Hop le. <@${userId}> hien co ${nextScore} diem trong van nay.`,
+      `Tu tiep theo phai bat dau bang "${nextRequired}".`
     ].join("\n"),
     session
+  };
+}
+
+async function distributeFinalRewards(session) {
+  const ranked = [...session.scores.entries()].sort((a, b) => b[1] - a[1]);
+
+  if (ranked.length < MIN_VALID_PLAYERS_FOR_REWARD) {
+    return {
+      rewarded: false,
+      lines: [
+        "Van nay chua du nguoi ghi diem de phat thuong.",
+        `Can it nhat ${MIN_VALID_PLAYERS_FOR_REWARD} nguoi co diem hop le moi mo thuong cuoi van.`
+      ]
+    };
+  }
+
+  const rewardLines = [];
+
+  for (let index = 0; index < ranked.length; index += 1) {
+    const [userId, score] = ranked[index];
+    const username = session.usernames.get(userId) || `user-${userId}`;
+    let totalReward = 0;
+    const detail = [];
+
+    if (index < FINAL_RANK_REWARDS.length) {
+      const rankReward = FINAL_RANK_REWARDS[index];
+      totalReward += rankReward;
+      detail.push(`top ${index + 1}: +${rankReward} Xu`);
+    }
+
+    if (score >= MIN_SCORE_FOR_PARTICIPATION_REWARD) {
+      totalReward += PARTICIPATION_REWARD_XU;
+      detail.push(`tham gia nang: +${PARTICIPATION_REWARD_XU} Xu`);
+    }
+
+    if (totalReward <= 0) {
+      continue;
+    }
+
+    await rewardPlayer(userId, username, totalReward, "word_chain_final_reward");
+    rewardLines.push(`<@${userId}> nhan ${totalReward} Xu (${detail.join(", ")}).`);
+  }
+
+  if (rewardLines.length === 0) {
+    return {
+      rewarded: false,
+      lines: ["Van nay khong co moc thuong nao duoc kich hoat."]
+    };
+  }
+
+  return {
+    rewarded: true,
+    lines: rewardLines
   };
 }
 
@@ -275,7 +338,7 @@ async function handleWordChainMessage(message) {
     pauseSession(message.channel.id);
     return {
       ok: true,
-      reply: "Đã tạm dừng ván nối từ trong phòng này. Gõ `!play` để chơi tiếp."
+      reply: "Da tam dung van noi tu trong phong nay. Go !play de choi tiep."
     };
   }
 
@@ -283,7 +346,7 @@ async function handleWordChainMessage(message) {
     const resumed = resumeSession(message.channel.id);
     return {
       ok: true,
-      reply: `Đã tiếp tục ván nối từ.\n${getHelpText(resumed)}`
+      reply: `Da tiep tuc van noi tu.\n${getHelpText(resumed)}`
     };
   }
 
@@ -305,5 +368,6 @@ module.exports = {
   getRoomConfig,
   getHelpText,
   handleWordChainMessage,
-  normalizePhrase
+  normalizePhrase,
+  distributeFinalRewards
 };
