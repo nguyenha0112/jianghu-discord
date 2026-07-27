@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { assertCanManageGameRoom } = require("../lib/room-admin");
 const { enableRoom } = require("../storage/word-chain-room-store");
+const { buildRoomGuideText } = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,13 +17,21 @@ module.exports = {
         createdByUsername: interaction.user.username
       });
 
-      await interaction.reply(
-        [
-          "Đã bật kênh này thành phòng chơi nối từ.",
-          "Người chơi có thể dùng `/noitu-tao` để bắt đầu ván.",
-          "Trong lúc chơi có thể gõ `!stop` để tạm dừng và `!play` để tiếp tục."
-        ].join("\n")
-      );
+      if (interaction.channel && "setTopic" in interaction.channel && typeof interaction.channel.setTopic === "function") {
+        const nextTopic = "Phong noi tu: !batdau de mo van, !stop de tam dung, !play de tiep tuc.";
+        await interaction.channel.setTopic(nextTopic).catch(() => {});
+      }
+
+      await interaction.reply("Đã bật kênh này thành phòng chơi nối từ.");
+      await interaction.channel.send({
+        embeds: [
+          {
+            color: 0x3498db,
+            title: "Hướng dẫn phòng nối từ",
+            description: buildRoomGuideText()
+          }
+        ]
+      });
     } catch (error) {
       await interaction.reply({ content: error.message, ephemeral: true });
     }

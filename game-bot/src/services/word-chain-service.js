@@ -30,6 +30,7 @@ const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(
 );
 
 const seedPhrases = ["yêu thương", "bầu trời", "hy vọng", "bình yên", "quê nhà", "hoa hồng", "gia đình", "niềm vui"];
+const START_KEYWORDS = new Set(["!batdau", "!choi", "!play", "bat dau", "bắt đầu", "chơi thôi"]);
 
 const validPhraseSet = loadValidPhraseSet();
 
@@ -129,6 +130,15 @@ function pickSeedPhrase() {
 
 function getSession(channelId) {
   return sessions.get(channelId) || null;
+}
+
+function shouldAutoStart(raw) {
+  const normalized = normalizePhrase(raw);
+  if (!normalized) {
+    return false;
+  }
+
+  return START_KEYWORDS.has(normalized) || isMeaningfulPhrase(normalized);
 }
 
 function getSecondsLeft(session) {
@@ -339,7 +349,18 @@ function getHelpText(session) {
     `Từ hiện tại: ${session.currentPhrase}`,
     `Từ cần nối: ${session.requiredToken}`,
     "Luật: chỉ nhận cụm 2 tiếng có nghĩa.",
-    "Mỗi lượt có 30 giây để trả lời."
+    "Mỗi lượt có 30 giây để trả lời.",
+    "Khi phòng chưa có ván, chỉ cần nhắn `!batdau` hoặc gửi ngay một cụm 2 tiếng để bot tự mở ván."
+  ].join("\n");
+}
+
+function buildRoomGuideText() {
+  return [
+    "**Phòng nối từ đã sẵn sàng.**",
+    "`!batdau` hoặc gửi luôn một cụm 2 tiếng có nghĩa để mở ván.",
+    "Khi ván đang chạy: chỉ cần nhắn cụm 2 tiếng để chơi.",
+    "`!stop` để tạm dừng, `!play` để chơi tiếp.",
+    "Sai bot chỉ đánh dấu `❌`, đúng bot đánh dấu `✅` và cập nhật khung trạng thái."
   ].join("\n");
 }
 
@@ -460,13 +481,37 @@ async function handleWordChainMessage(message) {
     return null;
   }
 
-  const session = sessions.get(message.channel.id);
-  if (!session || !session.active) {
-    return null;
-  }
-
   const raw = (message.content || "").trim();
   const lowered = raw.toLowerCase();
+  let session = sessions.get(message.channel.id);
+
+  if (!session || !session.active) {
+    if (!shouldAutoStart(raw)) {
+      return null;
+    }
+
+    const seedPhrase = START_KEYWORDS.has(normalizePhrase(raw)) ? null : raw;
+    session = startSession({
+      guildId: message.guild.id,
+      channelId: message.channel.id,
+      channelName: message.channel.name || "unknown",
+      hostUserId: message.author.id,
+      hostUsername: message.author.username,
+      seedPhrase
+    });
+
+    scheduleTurnTimeout(session, message.channel);
+    await sendOrRefreshStatusMessage(message.channel, session, {
+      title: "Nối Từ PvP",
+      accent: 0x3498db,
+      lastMoveLine: `Ván mới đã được mở bởi <@${message.author.id}>.`
+    });
+
+    return {
+      ok: true,
+      silent: true
+    };
+  }
 
   if (lowered === "!stop") {
     const pausedSession = pauseSession(message.channel.id);
@@ -518,5 +563,6 @@ module.exports = {
   isMeaningfulPhrase,
   sendOrRefreshStatusMessage,
   buildStatusEmbed,
-  scheduleTurnTimeout
+  scheduleTurnTimeout,
+  buildRoomGuideText
 };
