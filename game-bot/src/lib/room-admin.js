@@ -48,7 +48,7 @@ function canManageGameRoom(interaction) {
 function assertCanManageGameRoom(interaction) {
   if (!canManageGameRoom(interaction)) {
     throw new Error(
-      "Ban khong co quyen cau hinh phong noi tu. Can role duoc chi dinh trong env hoac quyen Discord Manage Channels, Manage Server, hoac Administrator."
+      "Bạn không có quyền cấu hình phòng nối từ. Cần role được chỉ định trong env hoặc quyền Discord Manage Channels, Manage Server, hoặc Administrator."
     );
   }
 }

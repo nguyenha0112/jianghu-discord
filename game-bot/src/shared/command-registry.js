@@ -3,20 +3,20 @@ const { SlashCommandBuilder } = require("discord.js");
 const commandBuilders = [
   new SlashCommandBuilder()
     .setName("ping")
-    .setDescription("Kiem tra bot co dang online khong."),
+    .setDescription("Kiểm tra bot có đang online không."),
   new SlashCommandBuilder()
     .setName("profile")
-    .setDescription("Xem ho so Jianghu cua ban."),
+    .setDescription("Xem hồ sơ Jianghu của bạn."),
   new SlashCommandBuilder()
     .setName("daily")
-    .setDescription("Nhan daily hang ngay."),
+    .setDescription("Nhận daily hằng ngày."),
   new SlashCommandBuilder()
     .setName("choose-profession")
-    .setDescription("Chon nghe nghiep chinh cua ban.")
+    .setDescription("Chọn nghề nghiệp chính của bạn.")
     .addStringOption((option) =>
       option
         .setName("profession")
-        .setDescription("Nghe ban muon theo")
+        .setDescription("Nghề bạn muốn theo")
         .setRequired(true)
         .addChoices(
           { name: "Fishing", value: "fishing" },
@@ -28,101 +28,101 @@ const commandBuilders = [
     ),
   new SlashCommandBuilder()
     .setName("work")
-    .setDescription("Thuc hien hanh dong nghe nghiep de nhan thuong."),
+    .setDescription("Thực hiện hành động nghề nghiệp để nhận thưởng."),
   new SlashCommandBuilder()
     .setName("inventory")
-    .setDescription("Xem tui do hien tai cua ban."),
+    .setDescription("Xem túi đồ hiện tại của bạn."),
   new SlashCommandBuilder()
     .setName("wallet")
-    .setDescription("Xem tong quan tien te va chi so kinh te cua ban."),
+    .setDescription("Xem tổng quan tiền tệ và chỉ số kinh tế của bạn."),
   new SlashCommandBuilder()
     .setName("sell")
-    .setDescription("Ban vat pham trong kho de doi Xu.")
+    .setDescription("Bán vật phẩm trong kho để đổi Xu.")
     .addStringOption((option) =>
       option
         .setName("item_id")
-        .setDescription("Item ID, vi du river_fish")
+        .setDescription("Item ID, ví dụ river_fish")
         .setRequired(true)
     )
     .addIntegerOption((option) =>
       option
         .setName("quantity")
-        .setDescription("So luong muon ban")
+        .setDescription("Số lượng muốn bán")
         .setRequired(true)
         .setMinValue(1)
     ),
   new SlashCommandBuilder()
     .setName("shop")
-    .setDescription("Xem hoac mua vat pham trong shop.")
+    .setDescription("Xem hoặc mua vật phẩm trong shop.")
     .addStringOption((option) =>
       option
         .setName("shop_id")
-        .setDescription("Nhap shop_id neu muon mua ngay")
+        .setDescription("Nhập shop_id nếu muốn mua ngay")
         .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("craft")
-    .setDescription("Xem hoac thuc hien craft theo cong thuc.")
+    .setDescription("Xem hoặc thực hiện craft theo công thức.")
     .addStringOption((option) =>
       option
         .setName("recipe_id")
-        .setDescription("Nhap recipe_id neu muon craft ngay")
+        .setDescription("Nhập recipe_id nếu muốn craft ngay")
         .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("noitu-tao-phong")
-    .setDescription("Bat channel hien tai thanh phong choi noi tu."),
+    .setDescription("Bật kênh hiện tại thành phòng chơi nối từ."),
   new SlashCommandBuilder()
     .setName("noitu-xoa-phong")
-    .setDescription("Tat che do phong choi noi tu o channel hien tai."),
+    .setDescription("Tắt chế độ phòng chơi nối từ ở kênh hiện tại."),
   new SlashCommandBuilder()
     .setName("noitu-tao")
-    .setDescription("Tao mot van noi tu trong channel hien tai.")
+    .setDescription("Tạo một ván nối từ trong kênh hiện tại.")
     .addStringOption((option) =>
       option
         .setName("tu_goi_y")
-        .setDescription("Cum tu mo dau neu ban muon tu chon")
+        .setDescription("Cụm từ mở đầu nếu bạn muốn tự chọn")
         .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("noitu-trangthai")
-    .setDescription("Xem trang thai van noi tu hien tai."),
+    .setDescription("Xem trạng thái ván nối từ hiện tại."),
   new SlashCommandBuilder()
     .setName("noitu-dung")
-    .setDescription("Dung van noi tu hien tai."),
+    .setDescription("Dừng ván nối từ hiện tại."),
   new SlashCommandBuilder()
     .setName("admin-player")
-    .setDescription("Xem thong tin chi tiet cua mot player.")
+    .setDescription("Xem thông tin chi tiết của một player.")
     .addStringOption((option) =>
       option
         .setName("user_id")
-        .setDescription("Discord user ID cua player")
+        .setDescription("Discord user ID của player")
         .setRequired(true)
     ),
   new SlashCommandBuilder()
     .setName("admin-transactions")
-    .setDescription("Xem giao dich gan nhat.")
+    .setDescription("Xem giao dịch gần nhất.")
     .addStringOption((option) =>
       option
         .setName("user_id")
-        .setDescription("Loc theo Discord user ID")
+        .setDescription("Lọc theo Discord user ID")
         .setRequired(false)
     )
     .addIntegerOption((option) =>
       option
         .setName("limit")
-        .setDescription("So giao dich muon xem")
+        .setDescription("Số giao dịch muốn xem")
         .setRequired(false)
         .setMinValue(1)
         .setMaxValue(20)
     ),
   new SlashCommandBuilder()
     .setName("admin-reset-player")
-    .setDescription("Reset toan bo du lieu cua mot player.")
+    .setDescription("Reset toàn bộ dữ liệu của một player.")
     .addStringOption((option) =>
       option
         .setName("user_id")
-        .setDescription("Discord user ID cua player")
+        .setDescription("Discord user ID của player")
         .setRequired(true)
     )
 ];

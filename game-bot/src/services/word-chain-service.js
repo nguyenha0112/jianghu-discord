@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/word-chain-room-store");
@@ -10,15 +12,59 @@ const MIN_VALID_PLAYERS_FOR_REWARD = 2;
 const MIN_SCORE_FOR_PARTICIPATION_REWARD = 3;
 const PARTICIPATION_REWARD_XU = 10;
 const FINAL_RANK_REWARDS = [80, 40, 20];
+const PHRASE_DICTIONARY_PATH = path.join(
+  __dirname,
+  "..",
+  "..",
+  "data",
+  "vietnamese-compound-phrases.txt"
+);
+const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(
+  __dirname,
+  "..",
+  "..",
+  "data",
+  "custom-vietnamese-phrases.txt"
+);
 
-const seedPhrases = [
-  "giang ho",
-  "mat troi",
-  "mua thu",
-  "bong dem",
-  "thien ha",
-  "hong nhan"
-];
+const seedPhrases = ["mặt trời", "mưa thu", "bóng đêm", "thiên hạ", "hồng nhan", "giang hồ"];
+
+const validPhraseSet = loadValidPhraseSet();
+
+function loadValidPhraseSet() {
+  try {
+    const phrases = [
+      ...loadPhraseFile(PHRASE_DICTIONARY_PATH),
+      ...loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH)
+    ];
+
+    return new Set(phrases);
+  } catch (error) {
+    console.error("Không thể tải từ điển nối từ:", error.message);
+    return new Set(seedPhrases.map((phrase) => normalizePhrase(phrase)));
+  }
+}
+
+function loadPhraseFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+
+  return fs
+    .readFileSync(filePath, "utf8")
+    .split(/\r?\n/u)
+    .map((line) => normalizePhrase(line))
+    .filter(Boolean)
+    .filter((phrase) => {
+      const tokens = phrase.split(" ").filter(Boolean);
+      if (tokens.length < 2 || tokens.length > 5) {
+        return false;
+      }
+
+      const singleCharacterTokens = tokens.filter((token) => token.length === 1).length;
+      return singleCharacterTokens < tokens.length;
+    });
+}
 
 function normalizePhrase(input) {
   return (input || "")
@@ -41,6 +87,25 @@ function getLastToken(phrase) {
 function getFirstToken(phrase) {
   const tokens = splitTokens(phrase);
   return tokens[0] || null;
+}
+
+function isMeaningfulPhrase(phrase) {
+  const normalized = normalizePhrase(phrase);
+  if (!normalized) {
+    return false;
+  }
+
+  const tokens = splitTokens(normalized);
+  if (tokens.length < 2 || tokens.length > 5) {
+    return false;
+  }
+
+  const singleCharacterTokens = tokens.filter((token) => token.length === 1).length;
+  if (singleCharacterTokens >= tokens.length) {
+    return false;
+  }
+
+  return validPhraseSet.has(normalized);
 }
 
 function getGuildHistory(guildId) {
@@ -90,10 +155,14 @@ function getSession(channelId) {
 
 function startSession({ guildId, channelId, channelName, hostUserId, hostUsername, seedPhrase }) {
   if (!isEnabledRoom(channelId)) {
-    throw new Error("Phong nay chua duoc cau hinh de choi noi tu. Hay dung /noitu-tao-phong truoc.");
+    throw new Error("Phòng này chưa được cấu hình để chơi nối từ. Hãy dùng `/noitu-tao-phong` trước.");
   }
 
   const seed = normalizePhrase(seedPhrase || pickSeedPhrase());
+  if (!isMeaningfulPhrase(seed)) {
+    throw new Error("Cụm mở đầu không nằm trong từ điển nối từ hiện tại. Hãy dùng một cụm tiếng Việt có nghĩa.");
+  }
+
   const lastToken = getLastToken(seed);
 
   const session = {
@@ -193,11 +262,12 @@ async function rewardPlayer(userId, username, xuGain, type = "word_chain_reward"
 
 function getHelpText(session) {
   return [
-    `Cum hien tai: "${session.currentPhrase}"`,
-    `Tu can noi tiep: "${session.requiredToken}"`,
-    "Go cum tu truc tiep trong phong de choi.",
-    "Dung !stop de tam dung, !play de tiep tuc, /noitu-dung de ket thuc van.",
-    "Thuong Xu chi duoc phat khi ket thuc van, khong cong Xu cho tung cau dung."
+    `Cụm hiện tại: "${session.currentPhrase}"`,
+    `Từ cần nối tiếp: "${session.requiredToken}"`,
+    "Gõ cụm từ trực tiếp trong phòng để chơi.",
+    "Chỉ chấp nhận cụm tiếng Việt có nghĩa nằm trong từ điển nối từ hiện tại.",
+    "Dùng `!stop` để tạm dừng, `!play` để tiếp tục, `/noitu-dung` để kết thúc ván.",
+    "Thưởng Xu chỉ được phát khi kết thúc ván, không cộng Xu cho từng câu đúng."
   ].join("\n");
 }
 
@@ -210,7 +280,7 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (session.paused) {
     return {
       ok: false,
-      reply: "Van noi tu dang tam dung. Go !play de tiep tuc."
+      reply: "Ván nối từ đang tạm dừng. Gõ `!play` để tiếp tục."
     };
   }
 
@@ -220,7 +290,14 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (tokens.length < 2) {
     return {
       ok: false,
-      reply: "Cum tu can it nhat 2 tieng de choi noi tu."
+      reply: "Cụm từ cần ít nhất 2 tiếng để chơi nối từ."
+    };
+  }
+
+  if (!isMeaningfulPhrase(normalized)) {
+    return {
+      ok: false,
+      reply: "Cụm này không có trong từ điển nối từ hiện tại hoặc chưa đủ nghĩa. Hãy dùng một cụm tiếng Việt tự nhiên hơn."
     };
   }
 
@@ -228,14 +305,14 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (firstToken !== session.requiredToken) {
     return {
       ok: false,
-      reply: `Cum nay chua hop le. Tu dau tien phai bat dau bang "${session.requiredToken}".`
+      reply: `Cụm này chưa hợp lệ. Từ đầu tiên phải bắt đầu bằng "${session.requiredToken}".`
     };
   }
 
   if (session.roundUsed.has(normalized)) {
     return {
       ok: false,
-      reply: "Cum tu nay da duoc dung trong van hien tai."
+      reply: "Cụm từ này đã được dùng trong ván hiện tại."
     };
   }
 
@@ -243,7 +320,7 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   if (recentUsage) {
     return {
       ok: false,
-      reply: `Tu nay da duoc su dung trong ${MAX_RECENT_WORDS} luot gan day. Ban co the dung lai sau ${recentUsage.remainingTurns} luot nua.`
+      reply: `Từ này đã được sử dụng trong ${MAX_RECENT_WORDS} lượt gần đây. Bạn có thể dùng lại sau ${recentUsage.remainingTurns} lượt nữa.`
     };
   }
 
@@ -261,8 +338,8 @@ async function processPhrase({ guildId, channelId, userId, username, phrase }) {
   return {
     ok: true,
     reply: [
-      `Hop le. <@${userId}> hien co ${nextScore} diem trong van nay.`,
-      `Tu tiep theo phai bat dau bang "${nextRequired}".`
+      `Hợp lệ. <@${userId}> hiện có ${nextScore} điểm trong ván này.`,
+      `Từ tiếp theo phải bắt đầu bằng "${nextRequired}".`
     ].join("\n"),
     session
   };
@@ -275,8 +352,8 @@ async function distributeFinalRewards(session) {
     return {
       rewarded: false,
       lines: [
-        "Van nay chua du nguoi ghi diem de phat thuong.",
-        `Can it nhat ${MIN_VALID_PLAYERS_FOR_REWARD} nguoi co diem hop le moi mo thuong cuoi van.`
+        "Ván này chưa đủ người ghi điểm để phát thưởng.",
+        `Cần ít nhất ${MIN_VALID_PLAYERS_FOR_REWARD} người có điểm hợp lệ mới mở thưởng cuối ván.`
       ]
     };
   }
@@ -297,7 +374,7 @@ async function distributeFinalRewards(session) {
 
     if (score >= MIN_SCORE_FOR_PARTICIPATION_REWARD) {
       totalReward += PARTICIPATION_REWARD_XU;
-      detail.push(`tham gia nang: +${PARTICIPATION_REWARD_XU} Xu`);
+      detail.push(`tham gia tốt: +${PARTICIPATION_REWARD_XU} Xu`);
     }
 
     if (totalReward <= 0) {
@@ -305,13 +382,13 @@ async function distributeFinalRewards(session) {
     }
 
     await rewardPlayer(userId, username, totalReward, "word_chain_final_reward");
-    rewardLines.push(`<@${userId}> nhan ${totalReward} Xu (${detail.join(", ")}).`);
+    rewardLines.push(`<@${userId}> nhận ${totalReward} Xu (${detail.join(", ")}).`);
   }
 
   if (rewardLines.length === 0) {
     return {
       rewarded: false,
-      lines: ["Van nay khong co moc thuong nao duoc kich hoat."]
+      lines: ["Ván này không có mốc thưởng nào được kích hoạt."]
     };
   }
 
@@ -338,7 +415,7 @@ async function handleWordChainMessage(message) {
     pauseSession(message.channel.id);
     return {
       ok: true,
-      reply: "Da tam dung van noi tu trong phong nay. Go !play de choi tiep."
+      reply: "Đã tạm dừng ván nối từ trong phòng này. Gõ `!play` để chơi tiếp."
     };
   }
 
@@ -346,7 +423,7 @@ async function handleWordChainMessage(message) {
     const resumed = resumeSession(message.channel.id);
     return {
       ok: true,
-      reply: `Da tiep tuc van noi tu.\n${getHelpText(resumed)}`
+      reply: `Đã tiếp tục ván nối từ.\n${getHelpText(resumed)}`
     };
   }
 
@@ -369,5 +446,6 @@ module.exports = {
   getHelpText,
   handleWordChainMessage,
   normalizePhrase,
-  distributeFinalRewards
+  distributeFinalRewards,
+  isMeaningfulPhrase
 };

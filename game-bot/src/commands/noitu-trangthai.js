@@ -36,7 +36,8 @@ module.exports = {
         },
         {
           name: "Cách chơi nhanh",
-          value: "Gõ cụm từ trực tiếp trong phòng. Dùng `!stop` để tạm dừng, `!play` để tiếp tục.",
+          value:
+            "Gõ cụm từ trực tiếp trong phòng. Dùng `!stop` để tạm dừng, `!play` để tiếp tục. Chỉ các cụm tiếng Việt có nghĩa trong từ điển mới được tính.",
           inline: false
         }
       );

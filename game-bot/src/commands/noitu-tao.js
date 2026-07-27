@@ -4,7 +4,7 @@ const { getHelpText, startSession } = require("../services/word-chain-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-tao")
-    .setDescription("Tạo một ván nối từ trong channel hiện tại.")
+    .setDescription("Tạo một ván nối từ trong kênh hiện tại.")
     .addStringOption((option) =>
       option
         .setName("tu_goi_y")
@@ -23,12 +23,7 @@ module.exports = {
         seedPhrase
       });
 
-      await interaction.reply(
-        [
-          "Đã tạo ván nối từ mới.",
-          getHelpText(session)
-        ].join("\n")
-      );
+      await interaction.reply(["Đã tạo ván nối từ mới.", getHelpText(session)].join("\n"));
     } catch (error) {
       await interaction.reply({ content: error.message, ephemeral: true });
     }

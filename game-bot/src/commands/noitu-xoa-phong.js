@@ -5,7 +5,7 @@ const { disableRoom, isEnabledRoom } = require("../storage/word-chain-room-store
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-xoa-phong")
-    .setDescription("Tắt chế độ phòng chơi nối từ ở channel hiện tại."),
+    .setDescription("Tắt chế độ phòng chơi nối từ ở kênh hiện tại."),
   async execute(interaction) {
     try {
       assertCanManageGameRoom(interaction);
@@ -16,7 +16,7 @@ module.exports = {
       }
 
       disableRoom(interaction.channelId);
-      await interaction.reply("Đã tắt chế độ phòng nối từ ở channel này.");
+      await interaction.reply("Đã tắt chế độ phòng nối từ ở kênh này.");
     } catch (error) {
       await interaction.reply({ content: error.message, ephemeral: true });
     }

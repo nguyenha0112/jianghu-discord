@@ -34,3 +34,7 @@ chat-bot/audio/
 chat-bot/.env
 game-bot/.env
 game-bot/data/
+!game-bot/data/
+game-bot/data/*
+!game-bot/data/vietnamese-compound-phrases.txt
+!game-bot/data/custom-vietnamese-phrases.txt
