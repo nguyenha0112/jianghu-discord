@@ -13,5 +13,11 @@ module.exports = {
   refined_essence: { name: "Refined Essence", rarity: "Rare" },
   old_coin: { name: "Old Coin", rarity: "Common" },
   relic_fragment: { name: "Relic Fragment", rarity: "Uncommon" },
-  sealed_relic: { name: "Sealed Relic", rarity: "Rare" }
+  sealed_relic: { name: "Sealed Relic", rarity: "Rare" },
+  basic_bait: { name: "Basic Bait", rarity: "Common" },
+  simple_pickaxe: { name: "Simple Pickaxe", rarity: "Uncommon" },
+  field_kit: { name: "Field Kit", rarity: "Uncommon" },
+  jade_token: { name: "Jade Token", rarity: "Rare" },
+  minor_potion: { name: "Minor Potion", rarity: "Uncommon" },
+  polished_relic: { name: "Polished Relic", rarity: "Rare" }
 };

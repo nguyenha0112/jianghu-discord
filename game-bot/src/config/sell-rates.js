@@ -13,5 +13,11 @@ module.exports = {
   refined_essence: 45,
   old_coin: 13,
   relic_fragment: 24,
-  sealed_relic: 50
+  sealed_relic: 50,
+  basic_bait: 8,
+  simple_pickaxe: 80,
+  field_kit: 70,
+  jade_token: 55,
+  minor_potion: 28,
+  polished_relic: 60
 };

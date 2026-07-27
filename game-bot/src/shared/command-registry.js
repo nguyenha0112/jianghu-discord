@@ -50,6 +50,24 @@ const commandBuilders = [
         .setDescription("So luong muon ban")
         .setRequired(true)
         .setMinValue(1)
+    ),
+  new SlashCommandBuilder()
+    .setName("shop")
+    .setDescription("Xem hoac mua vat pham trong shop.")
+    .addStringOption((option) =>
+      option
+        .setName("shop_id")
+        .setDescription("Nhap shop_id neu muon mua ngay")
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("craft")
+    .setDescription("Xem hoac thuc hien craft theo cong thuc.")
+    .addStringOption((option) =>
+      option
+        .setName("recipe_id")
+        .setDescription("Nhap recipe_id neu muon craft ngay")
+        .setRequired(false)
     )
 ];
 

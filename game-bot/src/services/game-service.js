@@ -2,6 +2,8 @@ const professions = require("../config/professions");
 const items = require("../config/items");
 const currencies = require("../config/currencies");
 const sellRates = require("../config/sell-rates");
+const shopItems = require("../config/shop-items");
+const recipes = require("../config/recipes");
 const { appendTransaction } = require("../storage/transaction-store");
 const {
   ensurePlayer,
@@ -255,6 +257,59 @@ function getWalletSummary(userId, username) {
   };
 }
 
+function getShopListings() {
+  return shopItems.map((entry) => ({
+    ...entry,
+    currencyName: currencies[entry.currency]?.name || entry.currency
+  }));
+}
+
+function buyShopItem(userId, username, shopId) {
+  const player = createPlayer(userId, username);
+  const listing = shopItems.find((entry) => entry.shopId === shopId);
+
+  if (!listing) {
+    return {
+      ok: false,
+      message: "Khong tim thay vat pham trong shop."
+    };
+  }
+
+  if ((player.wallet[listing.currency] || 0) < listing.price) {
+    return {
+      ok: false,
+      message: `Ban khong du ${currencies[listing.currency]?.name || listing.currency}.`
+    };
+  }
+
+  const updated = updatePlayer(userId, {
+    username,
+    wallet: {
+      ...player.wallet,
+      [listing.currency]: player.wallet[listing.currency] - listing.price
+    },
+    inventory: addItem(player.inventory, listing.itemId, listing.quantity)
+  });
+
+  appendTransaction({
+    userId,
+    username,
+    type: "shop_buy",
+    changes: {
+      currency: listing.currency,
+      amount: -listing.price,
+      itemId: listing.itemId,
+      quantity: listing.quantity
+    }
+  });
+
+  return {
+    ok: true,
+    player: updated,
+    message: `Ban da mua ${listing.name} voi gia ${listing.price} ${currencies[listing.currency]?.name || listing.currency}.`
+  };
+}
+
 function getInventoryLines(userId, username) {
   const player = createPlayer(userId, username);
   const entries = Object.entries(player.inventory);
@@ -272,6 +327,76 @@ function getInventoryLines(userId, username) {
       const rarity = item ? item.rarity : "Unknown";
       return `${itemName} x${quantity} [${rarity}]`;
     });
+}
+
+function getRecipeListings() {
+  return recipes.map((recipe) => ({
+    ...recipe,
+    outputName: items[recipe.output.itemId]?.name || recipe.output.itemId
+  }));
+}
+
+function hasEnoughInputs(inventory, inputs) {
+  return inputs.every((input) => (inventory[input.itemId] || 0) >= input.quantity);
+}
+
+function consumeInputs(inventory, inputs) {
+  return inputs.reduce((currentInventory, input) => {
+    return removeItem(currentInventory, input.itemId, input.quantity);
+  }, inventory);
+}
+
+function craftRecipe(userId, username, recipeId) {
+  const player = createPlayer(userId, username);
+  const recipe = recipes.find((entry) => entry.recipeId === recipeId);
+
+  if (!recipe) {
+    return {
+      ok: false,
+      message: "Khong tim thay cong thuc craft."
+    };
+  }
+
+  if (!hasEnoughInputs(player.inventory, recipe.inputs)) {
+    return {
+      ok: false,
+      message: "Ban chua du nguyen lieu de craft."
+    };
+  }
+
+  if (player.wallet.xu < recipe.cost.xu) {
+    return {
+      ok: false,
+      message: "Ban khong du Xu de craft."
+    };
+  }
+
+  const inventoryAfterConsume = consumeInputs(player.inventory, recipe.inputs);
+  const updated = updatePlayer(userId, {
+    username,
+    wallet: {
+      ...player.wallet,
+      xu: player.wallet.xu - recipe.cost.xu
+    },
+    inventory: addItem(inventoryAfterConsume, recipe.output.itemId, recipe.output.quantity)
+  });
+
+  appendTransaction({
+    userId,
+    username,
+    type: "craft",
+    changes: {
+      xu: -recipe.cost.xu,
+      outputItemId: recipe.output.itemId,
+      outputQuantity: recipe.output.quantity
+    }
+  });
+
+  return {
+    ok: true,
+    player: updated,
+    message: `Ban da craft ${items[recipe.output.itemId]?.name || recipe.output.itemId} x${recipe.output.quantity}.`
+  };
 }
 
 function sellItem(userId, username, itemId, quantity) {
@@ -334,7 +459,11 @@ module.exports = {
   doWork,
   getProfile,
   getWalletSummary,
+  getShopListings,
   getInventoryLines,
+  getRecipeListings,
+  buyShopItem,
+  craftRecipe,
   sellItem,
   formatDuration
 };

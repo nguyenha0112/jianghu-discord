@@ -12,6 +12,8 @@ Day la bot game rieng cho `Jianghu Discord`. No duoc tach khoi utility bot de gi
 - inventory va wallet co luu tru
 - sell loop de doi item thanh Xu
 - transaction log cho kinh te MVP
+- shop MVP de tao currency sink
+- crafting MVP de tao vong bien doi tai nguyen
 
 ## Kien truc
 
