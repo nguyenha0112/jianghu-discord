@@ -17,6 +17,7 @@ const PARTICIPATION_REWARD_XU = 10;
 const FINAL_RANK_REWARDS = [80, 40, 20];
 const BOT_PVE_USER_ID = "jianghu-pve-bot";
 const BOT_PVE_NAME = "Jianghu Bot";
+const REFERENCE_PAIR_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "reference-wordPairs.json");
 const PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-compound-phrases.txt");
 const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
 
@@ -24,18 +25,28 @@ const seedPhrases = ["yêu thương", "bầu trời", "hy vọng", "bình yên",
 const START_KEYWORDS = new Set(["batdau", "choi", "play", "bat dau", "bắt đầu", "chơi thôi"]);
 const STOP_KEYWORDS = new Set(["stop", "!stop"]);
 const PLAY_KEYWORDS = new Set(["play", "!play"]);
+const TEXT_COMMAND_ALIASES = new Map([
+  ["!batdau", "Bắt đầu một ván mới"],
+  ["!play", "Mở ván mới nếu phòng đang trống"],
+  ["!stop", "Kết thúc ván hiện tại"],
+  ["!help", "Xem hướng dẫn nhanh"]
+]);
 const HARD_ENDING_TOKENS = new Set(["vọng", "nguyệt", "rớt", "rịt", "quí", "chiều", "thanh", "ác"]);
 
 const phraseCatalog = loadPhraseCatalog();
 const validPhraseSet = new Set(phraseCatalog.allPhrases);
 const customPhraseSet = new Set(phraseCatalog.customPhrases);
+const referencePhraseSet = new Set(phraseCatalog.referencePhrases);
 
 function loadPhraseCatalog() {
   try {
+    const referencePhrases = loadReferencePhrasePairs(REFERENCE_PAIR_DICTIONARY_PATH);
     const basePhrases = loadPhraseFile(PHRASE_DICTIONARY_PATH);
     const customPhrases = loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH);
+    const allPhrases = referencePhrases.length > 0 ? [...new Set([...referencePhrases, ...customPhrases])] : [...new Set([...basePhrases, ...customPhrases])];
     return {
-      allPhrases: [...new Set([...basePhrases, ...customPhrases])],
+      allPhrases,
+      referencePhrases: [...new Set(referencePhrases)],
       customPhrases: [...new Set(customPhrases)]
     };
   } catch (error) {
@@ -43,9 +54,34 @@ function loadPhraseCatalog() {
     const fallback = seedPhrases.map((phrase) => normalizePhrase(phrase));
     return {
       allPhrases: fallback,
+      referencePhrases: fallback,
       customPhrases: fallback
     };
   }
+}
+
+function loadReferencePhrasePairs(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+
+  const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const phrases = [];
+
+  for (const [firstToken, seconds] of Object.entries(raw)) {
+    if (!Array.isArray(seconds)) {
+      continue;
+    }
+
+    for (const secondToken of seconds) {
+      const phrase = normalizePhrase(`${firstToken} ${secondToken}`);
+      if (splitTokens(phrase).length === 2) {
+        phrases.push(phrase);
+      }
+    }
+  }
+
+  return [...new Set(phrases)];
 }
 
 function loadPhraseFile(filePath) {
@@ -162,17 +198,20 @@ function scoreSeedPhrase(phrase) {
     guildId: "__seed__",
     roundUsed: new Set([phrase])
   });
+  const referenceBonus = referencePhraseSet.has(phrase) ? 15 : -20;
   const customBonus = customPhraseSet.has(phrase) ? 10 : 0;
   const hardPenalty = HARD_ENDING_TOKENS.has(lastToken) ? -25 : 0;
-  return branchScore + customBonus + hardPenalty;
+  return branchScore + referenceBonus + customBonus + hardPenalty;
 }
 
-function pickSeedPhrase() {
+function pickSeedPhrase(excludedPhrases = []) {
+  const excluded = new Set(excludedPhrases.map((phrase) => normalizePhrase(phrase)));
   const ranked = [...seedPhrases]
     .map((phrase) => normalizePhrase(phrase))
     .sort((a, b) => scoreSeedPhrase(b) - scoreSeedPhrase(a) || a.localeCompare(b, "vi"));
 
-  return ranked[0] || normalizePhrase(seedPhrases[0]);
+  const nextSeed = ranked.find((phrase) => !excluded.has(phrase));
+  return nextSeed || ranked[0] || normalizePhrase(seedPhrases[0]);
 }
 
 function getSession(channelId) {
@@ -189,6 +228,15 @@ function shouldAutoStart(raw) {
   return Boolean(normalized) && (START_KEYWORDS.has(normalized) || isMeaningfulPhrase(normalized));
 }
 
+function getAvailableTextCommandMessage() {
+  const commands = [...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`);
+  return `Lệnh chưa đúng. Bạn có thể dùng:\n${commands.join("\n")}`;
+}
+
+function isTextCommand(raw) {
+  return typeof raw === "string" && raw.trim().startsWith("!");
+}
+
 function getSecondsLeft(session) {
   const msLeft = Math.max(0, session.turnDeadlineAt - Date.now());
   return Math.ceil(msLeft / 1000);
@@ -199,6 +247,18 @@ function clearSessionTimer(session) {
     clearTimeout(session.turnTimer);
     session.turnTimer = null;
   }
+}
+
+function getTimeoutResultLine(session) {
+  if (session.mode === "pve") {
+    return `${BOT_PVE_NAME} thắng lượt này vì người chơi không trả lời kịp trong 30 giây.`;
+  }
+
+  if (session.lastMoverUserId && session.lastMoverUserId !== BOT_PVE_USER_ID) {
+    return `<@${session.lastMoverUserId}> thắng lượt này vì không ai nối kịp trong 30 giây.`;
+  }
+
+  return "Đã hết 30 giây mà chưa có câu trả lời hợp lệ. Bot sẽ mở lượt mới.";
 }
 
 function buildStatusEmbed(session, options = {}) {
@@ -278,6 +338,11 @@ function scheduleTurnTimeout(session, channel) {
       return;
     }
 
+    const introLine = getTimeoutResultLine(activeSession);
+    await startNextRound(activeSession, channel, introLine).catch(() => {});
+    await channel.send(`${introLine} Lượt mới đã bắt đầu.`).catch(() => {});
+    return;
+
     activeSession.paused = true;
     await sendOrRefreshStatusMessage(channel, activeSession, {
       accent: 0xe74c3c,
@@ -317,6 +382,7 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
     roundUsed: new Set([seed]),
     statusMessageId: null,
     currentStreak: 0,
+    lastMoverUserId: null,
     turnDeadlineAt: Date.now() + TURN_TIMEOUT_MS,
     turnTimer: null
   };
@@ -337,6 +403,7 @@ function resetSessionForNextRound(session, nextSeed) {
   session.usernames = new Map();
   session.roundUsed = new Set([seed]);
   session.currentStreak = 0;
+  session.lastMoverUserId = null;
   session.turnDeadlineAt = Date.now() + TURN_TIMEOUT_MS;
   pushRecentPhrase(session.guildId, seed);
 }
@@ -423,7 +490,7 @@ function getHelpText(session) {
     `Từ cần nối: ${session.requiredToken}`,
     `Chế độ: ${session.mode === "pve" ? "PvE" : "PvP"}`,
     "Luật: chỉ nhận cụm 2 tiếng có nghĩa.",
-    "Mỗi lượt có 30 giây để trả lời.",
+    "Mỗi lượt có 30 giây để trả lời. Hết giờ sẽ xử thua lượt ngay.",
     "Khi phòng chưa có ván, chỉ cần nhắn `!batdau` hoặc gửi ngay một cụm 2 tiếng để bot tự mở ván."
   ].join("\n");
 }
@@ -436,7 +503,8 @@ function buildRoomGuideText(mode = "pvp") {
     `**Phòng nối từ ${modeLabel} đã sẵn sàng.**`,
     modeText,
     "`!batdau` hoặc gửi luôn một cụm 2 tiếng có nghĩa để mở ván.",
-    "`!stop` để tạm dừng, `!play` để chơi tiếp.",
+    "`!stop` để dừng tay, `!play` để chơi tiếp.",
+    "Hết 30 giây không có câu trả lời hợp lệ sẽ xử thua lượt ngay.",
     "Sai bot chỉ đánh dấu `❌`, đúng bot đánh dấu `✅` và cập nhật khung trạng thái."
   ].join("\n");
 }
@@ -519,12 +587,14 @@ function chooseBotReply(session) {
     const bLast = getLastToken(b);
     const aBranch = countAvailableFollowups(aLast, session, a);
     const bBranch = countAvailableFollowups(bLast, session, b);
+    const aReference = referencePhraseSet.has(a) ? 15 : -20;
+    const bReference = referencePhraseSet.has(b) ? 15 : -20;
     const aCustom = customPhraseSet.has(a) ? 20 : 0;
     const bCustom = customPhraseSet.has(b) ? 20 : 0;
     const aHardPenalty = HARD_ENDING_TOKENS.has(aLast) ? -30 : 0;
     const bHardPenalty = HARD_ENDING_TOKENS.has(bLast) ? -30 : 0;
-    const aScore = aBranch + aCustom + aHardPenalty;
-    const bScore = bBranch + bCustom + bHardPenalty;
+    const aScore = aBranch + aReference + aCustom + aHardPenalty;
+    const bScore = bBranch + bReference + bCustom + bHardPenalty;
     return bScore - aScore || a.localeCompare(b, "vi");
   });
 
@@ -532,6 +602,7 @@ function chooseBotReply(session) {
   const bestLastToken = getLastToken(bestCandidate);
   const bestScore =
     countAvailableFollowups(bestLastToken, session, bestCandidate) +
+    (referencePhraseSet.has(bestCandidate) ? 15 : -20) +
     (customPhraseSet.has(bestCandidate) ? 20 : 0) +
     (HARD_ENDING_TOKENS.has(bestLastToken) ? -30 : 0);
 
@@ -607,6 +678,7 @@ async function applyAcceptedPhrase({ session, channel, userId, username, phrase,
   session.roundUsed.add(phrase);
   session.scores.set(userId, nextScore);
   session.usernames.set(userId, username);
+  session.lastMoverUserId = userId;
   pushRecentPhrase(session.guildId, phrase);
 
   scheduleTurnTimeout(session, channel);
@@ -617,7 +689,7 @@ async function applyAcceptedPhrase({ session, channel, userId, username, phrase,
 }
 
 async function startNextRound(session, channel, introLine) {
-  resetSessionForNextRound(session, pickSeedPhrase());
+  resetSessionForNextRound(session, pickSeedPhrase([session.currentPhrase]));
   scheduleTurnTimeout(session, channel);
   await sendOrRefreshStatusMessage(channel, session, {
     accent: 0x3498db,
@@ -628,6 +700,9 @@ async function startNextRound(session, channel, introLine) {
 async function processPvpPhrase({ guildId, channel, userId, username, phrase }) {
   const session = sessions.get(channel.id);
   if (!session || !session.active) {
+    if (normalizedCommand === "help" || raw === "!help") {
+      return { ok: true, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
+    }
     return null;
   }
 
@@ -795,6 +870,32 @@ async function handleWordChainMessage(message) {
       return { ok: true, silent: false, skipReaction: true, reply: "Hiện chưa có ván nào đang chạy để dừng." };
     }
 
+    if (raw === "!play" || normalizedCommand === "play") {
+      const mode = getRoomMode(message.channel.id);
+      session = startSession({
+        guildId: message.guild.id,
+        channelId: message.channel.id,
+        channelName: message.channel.name || "unknown",
+        hostUserId: message.author.id,
+        hostUsername: message.author.username,
+        seedPhrase: null,
+        mode
+      });
+
+      scheduleTurnTimeout(session, message.channel);
+      await sendOrRefreshStatusMessage(message.channel, session, {
+        accent: 0x3498db,
+        lastMoveLine: `VÃ¡n má»›i Ä‘Ã£ Ä‘Æ°á»£c má»Ÿ bá»Ÿi <@${message.author.id}>.`
+      });
+
+      return {
+        ok: true,
+        silent: false,
+        skipReaction: true,
+        reply: `ÄÃ£ má»Ÿ vÃ¡n má»›i á»Ÿ cháº¿ Ä‘á»™ **${session.mode.toUpperCase()}**. Tá»« hiá»‡n táº¡i lÃ  **${session.currentPhrase}**.`
+      };
+    }
+
     if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
       return {
         ok: true,
@@ -805,6 +906,10 @@ async function handleWordChainMessage(message) {
     }
 
     if (!shouldAutoStart(raw)) {
+      if (isTextCommand(raw)) {
+        return { ok: false, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
+      }
+
       return null;
     }
 
@@ -833,7 +938,21 @@ async function handleWordChainMessage(message) {
     };
   }
 
+  if (normalizedCommand === "help" || raw === "!help") {
+    return { ok: true, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
+  }
+
   if (STOP_KEYWORDS.has(lowered) || STOP_KEYWORDS.has(normalizedCommand)) {
+    const stoppedSession = stopSession(message.channel.id);
+    const rewardResult = await distributeFinalRewards(stoppedSession);
+    const topLine = buildScoreboard(stoppedSession.scores)[0] || "ChÆ°a cÃ³ ai ghi Ä‘iá»ƒm.";
+    return {
+      ok: true,
+      silent: false,
+      skipReaction: true,
+      reply: `ÄÃ£ káº¿t thÃºc vÃ¡n ná»‘i tá»«. Báº£ng Ä‘iá»ƒm dáº«n Ä‘áº§u: ${topLine}. ${rewardResult.lines.join(" ")}`
+    };
+
     const pausedSession = pauseSession(message.channel.id);
     await sendOrRefreshStatusMessage(message.channel, pausedSession, {
       accent: 0xf39c12,
@@ -843,6 +962,13 @@ async function handleWordChainMessage(message) {
   }
 
   if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
+    return {
+      ok: true,
+      silent: false,
+      skipReaction: true,
+      reply: "VÃ¡n hiá»‡n táº¡i Ä‘ang cháº¡y rá»“i. HÃ£y ná»‘i tá»« trÆ°á»›c hoáº·c dÃ¹ng `!stop` Ä‘á»ƒ káº¿t thÃºc vÃ¡n nÃ y."
+    };
+
     const resumed = resumeSession(message.channel.id);
     scheduleTurnTimeout(resumed, message.channel);
     await sendOrRefreshStatusMessage(message.channel, resumed, {
@@ -850,6 +976,10 @@ async function handleWordChainMessage(message) {
       lastMoveLine: `Ván chơi đã tiếp tục bởi <@${message.author.id}>.`
     });
     return { ok: true, silent: false, skipReaction: true, reply: "Đã tiếp tục ván nối từ." };
+  }
+
+  if (isTextCommand(raw)) {
+    return { ok: false, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
   }
 
   return session.mode === "pve"

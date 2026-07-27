@@ -281,11 +281,98 @@ async function runPveFlow() {
   };
 }
 
+async function runTimeoutFlow() {
+  const channelId = "test-timeout-room";
+  disableRoom(channelId);
+  stopSession(channelId);
+  enableRoom(channelId, {
+    guildId: "guild-5",
+    channelName: "timeout-room",
+    mode: "pvp",
+    createdByUserId: "admin",
+    createdByUsername: "Admin"
+  });
+
+  const channel = new FakeChannel(channelId, "timeout-room");
+
+  const startResult = await handleWordChainMessage(createMessage(channel, "guild-5", "!batdau", "u10", "Jade"));
+  if (!startResult?.ok) {
+    throw new Error("Timeout flow start failed");
+  }
+
+  const beforeTimeout = getSessionStatus(channelId);
+  const previousPhrase = beforeTimeout.currentPhrase;
+  const timeoutHandler = beforeTimeout.turnTimer._onTimeout;
+  clearTimeout(beforeTimeout.turnTimer);
+  await timeoutHandler();
+
+  const afterTimeout = getSessionStatus(channelId);
+  if (!afterTimeout) {
+    throw new Error("Timeout flow session disappeared unexpectedly");
+  }
+
+  if (afterTimeout.currentPhrase === previousPhrase) {
+    throw new Error("Timeout flow did not advance to a new round");
+  }
+
+  stopSession(channelId);
+  disableRoom(channelId);
+  return {
+    previousPhrase,
+    restartedPhrase: afterTimeout.currentPhrase
+  };
+}
+
+async function runTextCommandFlow() {
+  const channelId = "test-command-room";
+  disableRoom(channelId);
+  stopSession(channelId);
+  enableRoom(channelId, {
+    guildId: "guild-6",
+    channelName: "command-room",
+    mode: "pvp",
+    createdByUserId: "admin",
+    createdByUsername: "Admin"
+  });
+
+  const channel = new FakeChannel(channelId, "command-room");
+
+  const unknownResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!abc", "u11", "Kira"));
+  if (unknownResult?.ok || !unknownResult?.reply?.includes("!batdau")) {
+    throw new Error("Unknown text command did not return command help");
+  }
+
+  const playResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!play", "u11", "Kira"));
+  if (!playResult?.ok) {
+    throw new Error("Text !play did not start a new round when room was empty");
+  }
+
+  const runningPlayResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!play", "u11", "Kira"));
+  if (!runningPlayResult?.ok || !runningPlayResult?.reply?.includes("!stop")) {
+    throw new Error("Text !play while running did not explain the current session");
+  }
+
+  const stopResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!stop", "u11", "Kira"));
+  if (!stopResult?.ok || !stopResult?.reply?.includes("k")) {
+    throw new Error("Text !stop did not end the current session");
+  }
+
+  stopSession(channelId);
+  disableRoom(channelId);
+  return {
+    unknownCommandHelp: true,
+    playStartsNewRound: true,
+    stopEndsRound: true
+  };
+}
+
 async function main() {
   const pvp = await runPvpFlow();
   const pvpRecentRepeat = await runPvpRecentRepeatFlow();
   const pvpRoundWin = await runPvpRoundWinFlow();
   const pve = await runPveFlow();
+  const timeout = await runTimeoutFlow();
+  const textCommands = await runTextCommandFlow();
 
   console.log(
     JSON.stringify(
@@ -294,7 +381,9 @@ async function main() {
         pvp,
         pvpRecentRepeat,
         pvpRoundWin,
-        pve
+        pve,
+        timeout,
+        textCommands
       },
       null,
       2
