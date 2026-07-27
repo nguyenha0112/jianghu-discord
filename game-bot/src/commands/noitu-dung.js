@@ -4,12 +4,12 @@ const { stopSession } = require("../services/word-chain-service");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-dung")
-    .setDescription("Dung van noi tu hien tai."),
+    .setDescription("Dừng ván nối từ hiện tại."),
   async execute(interaction) {
     const session = stopSession(interaction.channelId);
 
     if (!session) {
-      await interaction.reply("Khong co van noi tu nao de dung.");
+      await interaction.reply("Không có ván nối từ nào đang chạy để dừng.");
       return;
     }
 
@@ -23,9 +23,9 @@ module.exports = {
 
     await interaction.reply(
       [
-        "Da dung van noi tu.",
-        `Tong so luot hop le: ${session.moveCount}`,
-        `Bang diem:\n${scoreboard}`
+        "Đã dừng ván nối từ.",
+        `Tổng số lượt hợp lệ: ${session.moveCount}`,
+        `Bảng điểm:\n${scoreboard}`
       ].join("\n")
     );
   }

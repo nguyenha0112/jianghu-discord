@@ -68,3 +68,4 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Test ket noi Supabase thanh cong
 - [x] Chuyen player va transaction storage sang Supabase
 - [x] Chuyen inventory/runtime hoan toan sang Supabase that
+- [x] Game hoa phong noi tu

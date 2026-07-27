@@ -70,6 +70,12 @@ const commandBuilders = [
         .setRequired(false)
     ),
   new SlashCommandBuilder()
+    .setName("noitu-tao-phong")
+    .setDescription("Bat channel hien tai thanh phong choi noi tu."),
+  new SlashCommandBuilder()
+    .setName("noitu-xoa-phong")
+    .setDescription("Tat che do phong choi noi tu o channel hien tai."),
+  new SlashCommandBuilder()
     .setName("noitu-tao")
     .setDescription("Tao mot van noi tu trong channel hien tai.")
     .addStringOption((option) =>

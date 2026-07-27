@@ -1,28 +1,42 @@
 const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
-const { getSessionStatus } = require("../services/word-chain-service");
+const { getRoomConfig, getSessionStatus } = require("../services/word-chain-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-trangthai")
-    .setDescription("Xem trang thai van noi tu hien tai."),
+    .setDescription("Xem trạng thái ván nối từ hiện tại."),
   async execute(interaction) {
+    const roomConfig = getRoomConfig(interaction.channelId);
+    if (!roomConfig) {
+      await interaction.reply("Phòng này chưa được cấu hình là phòng nối từ.");
+      return;
+    }
+
     const session = getSessionStatus(interaction.channelId);
 
     if (!session) {
-      await interaction.reply("Channel nay hien chua co van noi tu nao dang chay.");
+      await interaction.reply(
+        "Phòng này đã bật nối từ nhưng hiện chưa có ván nào đang chạy. Dùng `/noitu-tao` để bắt đầu."
+      );
       return;
     }
 
     const embed = new EmbedBuilder()
-      .setTitle("Trang thai Noi Tu")
+      .setTitle("Trạng thái Nối Từ")
       .addFields(
-        { name: "Chu phong", value: session.hostUsername, inline: true },
-        { name: "Cum tu hien tai", value: session.currentPhrase, inline: false },
-        { name: "Tu can noi tiep", value: session.requiredToken, inline: true },
-        { name: "So luot hop le", value: String(session.moveCount), inline: true },
+        { name: "Chủ phòng", value: session.hostUsername, inline: true },
+        { name: "Trạng thái", value: session.paused ? "Đang tạm dừng" : "Đang chạy", inline: true },
+        { name: "Cụm từ hiện tại", value: session.currentPhrase, inline: false },
+        { name: "Từ cần nối tiếp", value: session.requiredToken, inline: true },
+        { name: "Số lượt hợp lệ", value: String(session.moveCount), inline: true },
         {
-          name: "Bang diem",
-          value: session.scoreboard.length > 0 ? session.scoreboard.join("\n") : "Chua co diem.",
+          name: "Bảng điểm",
+          value: session.scoreboard.length > 0 ? session.scoreboard.join("\n") : "Chưa có điểm.",
+          inline: false
+        },
+        {
+          name: "Cách chơi nhanh",
+          value: "Gõ cụm từ trực tiếp trong phòng. Dùng `!stop` để tạm dừng, `!play` để tiếp tục.",
           inline: false
         }
       );
