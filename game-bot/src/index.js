@@ -6,11 +6,59 @@ const path = require("node:path");
 const { handleWordChainMessage } = require("./services/word-chain-service");
 
 const token = process.env.DISCORD_TOKEN;
+const runtimeDir = path.join(__dirname, "..", "data", "runtime");
+const lockFile = path.join(runtimeDir, "bot.lock");
 
 if (!token) {
   console.error("Thiếu DISCORD_TOKEN trong game-bot/.env");
   process.exit(1);
 }
+
+function ensureSingleInstance() {
+  fs.mkdirSync(runtimeDir, { recursive: true });
+
+  if (fs.existsSync(lockFile)) {
+    try {
+      const existingPid = Number(fs.readFileSync(lockFile, "utf8").trim());
+      if (existingPid && existingPid !== process.pid) {
+        process.kill(existingPid, 0);
+        console.error(`Bot đang chạy ở tiến trình khác (${existingPid}). Bỏ qua lần khởi động này.`);
+        process.exit(1);
+      }
+    } catch (error) {
+      // Lock cũ không còn hợp lệ, sẽ ghi đè ở dưới.
+    }
+  }
+
+  fs.writeFileSync(lockFile, String(process.pid));
+}
+
+function cleanupLockFile() {
+  try {
+    if (!fs.existsSync(lockFile)) {
+      return;
+    }
+
+    const existingPid = Number(fs.readFileSync(lockFile, "utf8").trim());
+    if (!existingPid || existingPid === process.pid) {
+      fs.rmSync(lockFile, { force: true });
+    }
+  } catch (error) {
+    // Bỏ qua lỗi dọn lock khi thoát.
+  }
+}
+
+ensureSingleInstance();
+
+process.on("exit", cleanupLockFile);
+process.on("SIGINT", () => {
+  cleanupLockFile();
+  process.exit(0);
+});
+process.on("SIGTERM", () => {
+  cleanupLockFile();
+  process.exit(0);
+});
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
