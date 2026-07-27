@@ -76,6 +76,12 @@ client.on(Events.MessageCreate, async (message) => {
     return;
   }
 
+  if (result.ok) {
+    await message.react("✅").catch(() => {});
+  } else {
+    await message.react("❌").catch(() => {});
+  }
+
   await message.reply(result.reply).catch(() => {});
 });
 
