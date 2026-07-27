@@ -17,6 +17,7 @@ const PARTICIPATION_REWARD_XU = 10;
 const FINAL_RANK_REWARDS = [80, 40, 20];
 const BOT_PVE_USER_ID = "jianghu-pve-bot";
 const BOT_PVE_NAME = "Jianghu Bot";
+
 const REFERENCE_PAIR_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "reference-wordPairs.json");
 const PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-compound-phrases.txt");
 const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
@@ -25,6 +26,7 @@ const seedPhrases = ["yêu thương", "bầu trời", "hy vọng", "bình yên",
 const START_KEYWORDS = new Set(["batdau", "choi", "play", "bat dau", "bắt đầu", "chơi thôi"]);
 const STOP_KEYWORDS = new Set(["stop", "!stop"]);
 const PLAY_KEYWORDS = new Set(["play", "!play"]);
+const HELP_KEYWORDS = new Set(["help", "!help"]);
 const TEXT_COMMAND_ALIASES = new Map([
   ["!batdau", "Bắt đầu một ván mới"],
   ["!play", "Mở ván mới nếu phòng đang trống"],
@@ -43,7 +45,11 @@ function loadPhraseCatalog() {
     const referencePhrases = loadReferencePhrasePairs(REFERENCE_PAIR_DICTIONARY_PATH);
     const basePhrases = loadPhraseFile(PHRASE_DICTIONARY_PATH);
     const customPhrases = loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH);
-    const allPhrases = referencePhrases.length > 0 ? [...new Set([...referencePhrases, ...customPhrases])] : [...new Set([...basePhrases, ...customPhrases])];
+    const allPhrases =
+      referencePhrases.length > 0
+        ? [...new Set([...referencePhrases, ...customPhrases])]
+        : [...new Set([...basePhrases, ...customPhrases])];
+
     return {
       allPhrases,
       referencePhrases: [...new Set(referencePhrases)],
@@ -110,19 +116,28 @@ function splitTokens(phrase) {
   return normalizePhrase(phrase).split(" ").filter(Boolean);
 }
 
-function getLastToken(phrase) {
-  const tokens = splitTokens(phrase);
-  return tokens[tokens.length - 1] || null;
-}
-
 function getFirstToken(phrase) {
   const tokens = splitTokens(phrase);
   return tokens[0] || null;
 }
 
+function getLastToken(phrase) {
+  const tokens = splitTokens(phrase);
+  return tokens[tokens.length - 1] || null;
+}
+
 function isMeaningfulPhrase(phrase) {
   const normalized = normalizePhrase(phrase);
   return Boolean(normalized) && splitTokens(normalized).length === 2 && validPhraseSet.has(normalized);
+}
+
+function isTextCommand(raw) {
+  return typeof raw === "string" && raw.trim().startsWith("!");
+}
+
+function getAvailableTextCommandMessage() {
+  const commands = [...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`);
+  return `Lệnh chưa đúng. Bạn có thể dùng:\n${commands.join("\n")}`;
 }
 
 function getGuildHistory(guildId) {
@@ -228,15 +243,6 @@ function shouldAutoStart(raw) {
   return Boolean(normalized) && (START_KEYWORDS.has(normalized) || isMeaningfulPhrase(normalized));
 }
 
-function getAvailableTextCommandMessage() {
-  const commands = [...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`);
-  return `Lệnh chưa đúng. Bạn có thể dùng:\n${commands.join("\n")}`;
-}
-
-function isTextCommand(raw) {
-  return typeof raw === "string" && raw.trim().startsWith("!");
-}
-
 function getSecondsLeft(session) {
   const msLeft = Math.max(0, session.turnDeadlineAt - Date.now());
   return Math.ceil(msLeft / 1000);
@@ -259,6 +265,14 @@ function getTimeoutResultLine(session) {
   }
 
   return "Đã hết 30 giây mà chưa có câu trả lời hợp lệ. Bot sẽ mở lượt mới.";
+}
+
+async function concludeSessionOnTimeout(session, channel) {
+  const timeoutLine = getTimeoutResultLine(session);
+  clearSessionTimer(session);
+  sessions.delete(session.channelId);
+
+  await channel.send(`${timeoutLine} Ván hiện tại đã kết thúc, gõ \`!play\` để mở ván mới.`).catch(() => {});
 }
 
 function buildStatusEmbed(session, options = {}) {
@@ -285,8 +299,8 @@ function buildStatusEmbed(session, options = {}) {
         name: "Hướng dẫn nhanh",
         value:
           session.mode === "pve"
-            ? "Người chơi nối với bot bằng **cụm 2 tiếng có nghĩa**. Dùng `!stop` để tạm dừng, `!play` để tiếp tục."
-            : "Người chơi nối với nhau bằng **cụm 2 tiếng có nghĩa**. Dùng `!stop` để tạm dừng, `!play` để tiếp tục.",
+            ? "Người chơi nối với bot bằng **cụm 2 tiếng có nghĩa**. `!stop` để kết thúc ván, `!play` để mở ván mới khi phòng đang trống."
+            : "Người chơi nối với nhau bằng **cụm 2 tiếng có nghĩa**. `!stop` để kết thúc ván, `!play` để mở ván mới khi phòng đang trống.",
         inline: false
       },
       {
@@ -303,8 +317,8 @@ function buildStatusEmbed(session, options = {}) {
     .setFooter({
       text:
         session.mode === "pvp"
-          ? "Sai chỉ bị đánh dấu reaction. Hết đường nối, bot sẽ tự chốt người thắng và mở lượt mới."
-          : "Sai chỉ bị đánh dấu reaction. Bot sẽ ưu tiên các cụm tự nhiên hơn khi nối lại."
+          ? "Hết 30 giây hoặc hết đường nối, bot sẽ chốt kết quả và mở lượt mới."
+          : "Bot ưu tiên các cụm tự nhiên hơn. Hết 30 giây sẽ xử thắng thua ngay."
     });
 }
 
@@ -338,17 +352,7 @@ function scheduleTurnTimeout(session, channel) {
       return;
     }
 
-    const introLine = getTimeoutResultLine(activeSession);
-    await startNextRound(activeSession, channel, introLine).catch(() => {});
-    await channel.send(`${introLine} Lượt mới đã bắt đầu.`).catch(() => {});
-    return;
-
-    activeSession.paused = true;
-    await sendOrRefreshStatusMessage(channel, activeSession, {
-      accent: 0xe74c3c,
-      lastMoveLine: "Đã hết 30 giây mà chưa có câu trả lời hợp lệ. Ván đã tự tạm dừng, gõ `!play` để tiếp tục."
-    }).catch(() => {});
-    await channel.send("Hết 30 giây mà chưa có câu trả lời hợp lệ. Ván đã tự tạm dừng, gõ `!play` để chơi tiếp.").catch(() => {});
+    await concludeSessionOnTimeout(activeSession, channel);
   }, TURN_TIMEOUT_MS);
 }
 
@@ -491,7 +495,9 @@ function getHelpText(session) {
     `Chế độ: ${session.mode === "pve" ? "PvE" : "PvP"}`,
     "Luật: chỉ nhận cụm 2 tiếng có nghĩa.",
     "Mỗi lượt có 30 giây để trả lời. Hết giờ sẽ xử thua lượt ngay.",
-    "Khi phòng chưa có ván, chỉ cần nhắn `!batdau` hoặc gửi ngay một cụm 2 tiếng để bot tự mở ván."
+    "Khi phòng chưa có ván, chỉ cần nhắn `!batdau`, `!play` hoặc gửi ngay một cụm 2 tiếng để bot tự mở ván.",
+    "`!stop` để kết thúc ván hiện tại.",
+    "`!help` để xem hướng dẫn nhanh."
   ].join("\n");
 }
 
@@ -503,9 +509,11 @@ function buildRoomGuideText(mode = "pvp") {
     `**Phòng nối từ ${modeLabel} đã sẵn sàng.**`,
     modeText,
     "`!batdau` hoặc gửi luôn một cụm 2 tiếng có nghĩa để mở ván.",
-    "`!stop` để dừng tay, `!play` để chơi tiếp.",
+    "`!play` để mở ván mới khi phòng đang trống.",
+    "`!stop` để kết thúc ván hiện tại.",
+    "`!help` để xem hướng dẫn nhanh.",
     "Hết 30 giây không có câu trả lời hợp lệ sẽ xử thua lượt ngay.",
-    "Sai bot chỉ đánh dấu `❌`, đúng bot đánh dấu `✅` và cập nhật khung trạng thái."
+    "Nếu gõ sai lệnh bắt đầu bằng `!`, bot sẽ nhắc lại các lệnh đúng."
   ].join("\n");
 }
 
@@ -700,9 +708,6 @@ async function startNextRound(session, channel, introLine) {
 async function processPvpPhrase({ guildId, channel, userId, username, phrase }) {
   const session = sessions.get(channel.id);
   if (!session || !session.active) {
-    if (normalizedCommand === "help" || raw === "!help") {
-      return { ok: true, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
-    }
     return null;
   }
 
@@ -866,11 +871,15 @@ async function handleWordChainMessage(message) {
   let session = sessions.get(message.channel.id);
 
   if (!session || !session.active) {
+    if (HELP_KEYWORDS.has(lowered) || HELP_KEYWORDS.has(normalizedCommand)) {
+      return { ok: true, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
+    }
+
     if (STOP_KEYWORDS.has(lowered) || STOP_KEYWORDS.has(normalizedCommand)) {
       return { ok: true, silent: false, skipReaction: true, reply: "Hiện chưa có ván nào đang chạy để dừng." };
     }
 
-    if (raw === "!play" || normalizedCommand === "play") {
+    if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
       const mode = getRoomMode(message.channel.id);
       session = startSession({
         guildId: message.guild.id,
@@ -885,23 +894,14 @@ async function handleWordChainMessage(message) {
       scheduleTurnTimeout(session, message.channel);
       await sendOrRefreshStatusMessage(message.channel, session, {
         accent: 0x3498db,
-        lastMoveLine: `VÃ¡n má»›i Ä‘Ã£ Ä‘Æ°á»£c má»Ÿ bá»Ÿi <@${message.author.id}>.`
+        lastMoveLine: `Ván mới đã được mở bởi <@${message.author.id}>.`
       });
 
       return {
         ok: true,
         silent: false,
         skipReaction: true,
-        reply: `ÄÃ£ má»Ÿ vÃ¡n má»›i á»Ÿ cháº¿ Ä‘á»™ **${session.mode.toUpperCase()}**. Tá»« hiá»‡n táº¡i lÃ  **${session.currentPhrase}**.`
-      };
-    }
-
-    if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
-      return {
-        ok: true,
-        silent: false,
-        skipReaction: true,
-        reply: "Hiện chưa có ván nào để tiếp tục. Hãy nhắn `!batdau` hoặc gửi một cụm 2 tiếng để mở ván mới."
+        reply: `Đã mở ván mới ở chế độ **${session.mode.toUpperCase()}**. Từ hiện tại là **${session.currentPhrase}**.`
       };
     }
 
@@ -938,27 +938,20 @@ async function handleWordChainMessage(message) {
     };
   }
 
-  if (normalizedCommand === "help" || raw === "!help") {
+  if (HELP_KEYWORDS.has(lowered) || HELP_KEYWORDS.has(normalizedCommand)) {
     return { ok: true, silent: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
   }
 
   if (STOP_KEYWORDS.has(lowered) || STOP_KEYWORDS.has(normalizedCommand)) {
     const stoppedSession = stopSession(message.channel.id);
     const rewardResult = await distributeFinalRewards(stoppedSession);
-    const topLine = buildScoreboard(stoppedSession.scores)[0] || "ChÆ°a cÃ³ ai ghi Ä‘iá»ƒm.";
+    const topLine = buildScoreboard(stoppedSession.scores)[0] || "Chưa có ai ghi điểm.";
     return {
       ok: true,
       silent: false,
       skipReaction: true,
-      reply: `ÄÃ£ káº¿t thÃºc vÃ¡n ná»‘i tá»«. Báº£ng Ä‘iá»ƒm dáº«n Ä‘áº§u: ${topLine}. ${rewardResult.lines.join(" ")}`
+      reply: `Đã kết thúc ván nối từ. Bảng điểm dẫn đầu: ${topLine}. ${rewardResult.lines.join(" ")}`
     };
-
-    const pausedSession = pauseSession(message.channel.id);
-    await sendOrRefreshStatusMessage(message.channel, pausedSession, {
-      accent: 0xf39c12,
-      lastMoveLine: `Ván chơi đã được tạm dừng bởi <@${message.author.id}>.`
-    });
-    return { ok: true, silent: false, skipReaction: true, reply: "Đã tạm dừng ván nối từ." };
   }
 
   if (PLAY_KEYWORDS.has(lowered) || PLAY_KEYWORDS.has(normalizedCommand)) {
@@ -966,16 +959,8 @@ async function handleWordChainMessage(message) {
       ok: true,
       silent: false,
       skipReaction: true,
-      reply: "VÃ¡n hiá»‡n táº¡i Ä‘ang cháº¡y rá»“i. HÃ£y ná»‘i tá»« trÆ°á»›c hoáº·c dÃ¹ng `!stop` Ä‘á»ƒ káº¿t thÃºc vÃ¡n nÃ y."
+      reply: "Ván hiện tại đang chạy rồi. Hãy nối từ trước hoặc dùng `!stop` để kết thúc ván này."
     };
-
-    const resumed = resumeSession(message.channel.id);
-    scheduleTurnTimeout(resumed, message.channel);
-    await sendOrRefreshStatusMessage(message.channel, resumed, {
-      accent: 0x3498db,
-      lastMoveLine: `Ván chơi đã tiếp tục bởi <@${message.author.id}>.`
-    });
-    return { ok: true, silent: false, skipReaction: true, reply: "Đã tiếp tục ván nối từ." };
   }
 
   if (isTextCommand(raw)) {
