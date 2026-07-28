@@ -16,6 +16,8 @@ const MAX_RECENT_WORDS = 30;
 const MIN_PVP_REWARDED_PLAYERS = 2;
 const PVP_POINT_REWARD_XU = 12;
 const PVP_WIN_BONUS_XU = 30;
+const PVP_CHECKPOINT_INTERVAL = 25;
+const PVP_CHECKPOINT_LEADER_BONUS_XU = 60;
 const PVE_POINT_REWARD_XU = 10;
 const PVE_WIN_BONUS_XU = 20;
 const WORD_CHAIN_POINT_XP = 4;
@@ -283,7 +285,7 @@ function buildStatusEmbed(session, options = {}) {
   const modeGuide =
     session.mode === "pve"
       ? `Farm tự do với bot. ${PVE_POINT_REWARD_XU} Xu mỗi điểm, thắng bot thêm ${PVE_WIN_BONUS_XU} Xu.`
-      : `Đối kháng tự do nhiều người. ${PVP_POINT_REWARD_XU} Xu mỗi điểm, người đứng đầu nhận thêm ${PVP_WIN_BONUS_XU} Xu.`;
+      : `Đối kháng tự do nhiều người. ${PVP_POINT_REWARD_XU} Xu mỗi điểm nhưng giảm dần theo mốc, cứ ${PVP_CHECKPOINT_INTERVAL} lượt sẽ chốt thưởng giữa trận và người đứng đầu nhận thêm ${PVP_CHECKPOINT_LEADER_BONUS_XU} Xu.`;
 
   return new EmbedBuilder()
     .setColor(options.accent || 0x2ecc71)
@@ -356,8 +358,136 @@ function createBaseSession({ guildId, channelId, channelName, hostUserId, hostUs
     warningTimers: [],
     participants: [],
     turnOrder: [],
-    currentTurnIndex: 0
+    currentTurnIndex: 0,
+    lastRewardMoveCount: 0,
+    rewardedScores: new Map()
   };
+}
+
+function cloneScoreMap(scores) {
+  return new Map(scores ? [...scores.entries()] : []);
+}
+
+function getProgressivePointReward(score, baseReward) {
+  let remaining = Math.max(0, Number(score) || 0);
+  let reward = 0;
+  const tiers = [
+    { limit: 200, rate: 1 },
+    { limit: 300, rate: 0.7 },
+    { limit: 500, rate: 0.45 },
+    { limit: 1000, rate: 0.25 },
+    { limit: Number.POSITIVE_INFINITY, rate: 0.1 }
+  ];
+
+  for (const tier of tiers) {
+    if (remaining <= 0) {
+      break;
+    }
+    const used = Math.min(remaining, tier.limit);
+    reward += Math.floor(used * baseReward * tier.rate);
+    remaining -= used;
+  }
+
+  return reward;
+}
+
+function getRewardRanking(session, { deltaOnly = false } = {}) {
+  const baseline = deltaOnly ? session.rewardedScores || new Map() : new Map();
+  return [...session.scores.entries()]
+    .filter(([userId]) => userId !== BOT_PVE_USER_ID)
+    .map(([userId, score]) => {
+      const baselineScore = baseline.get(userId) || 0;
+      return [userId, deltaOnly ? Math.max(0, score - baselineScore) : score, score];
+    })
+    .filter(([, rewardScore]) => rewardScore > 0)
+    .sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+}
+
+async function rewardRankingSnapshot(session, {
+  deltaOnly = false,
+  leaderBonusXu = 0,
+  leaderBonusXp = 0,
+  type = "word_chain_final_reward",
+  label = "kết ván"
+} = {}) {
+  const ranked = getRewardRanking(session, { deltaOnly });
+
+  if (session.mode === "pvp" && ranked.length < MIN_PVP_REWARDED_PLAYERS) {
+    return { rewarded: false, lines: [`PvP chỉ phát thưởng khi có ít nhất ${MIN_PVP_REWARDED_PLAYERS} người chơi có điểm hợp lệ.`] };
+  }
+  if (ranked.length === 0) {
+    return { rewarded: false, lines: ["Ván này chưa có ai đạt điều kiện nhận thưởng."] };
+  }
+
+  const rewardLines = [];
+  for (let index = 0; index < ranked.length; index += 1) {
+    const [userId, rewardScore, totalScore] = ranked[index];
+    const username = session.usernames.get(userId) || `user-${userId}`;
+    const pointReward = getProgressivePointReward(
+      rewardScore,
+      session.mode === "pve" ? PVE_POINT_REWARD_XU : PVP_POINT_REWARD_XU
+    );
+    let totalReward = pointReward;
+    let xpGain = rewardScore * WORD_CHAIN_POINT_XP;
+
+    if (index === 0 && leaderBonusXu > 0) {
+      totalReward += leaderBonusXu;
+      xpGain += leaderBonusXp;
+    }
+
+    if (totalReward <= 0) {
+      continue;
+    }
+
+    const updatedPlayer = await rewardPlayer(userId, username, totalReward, xpGain, type);
+    const balance = updatedPlayer?.wallet?.xu ?? totalReward;
+    updateWordChainRanking(userId, username, session.mode, {
+      wins: index === 0 && label === "kết ván" ? 1 : 0,
+      points: totalScore,
+      games: label === "kết ván" ? 1 : 0
+    });
+
+    rewardLines.push(
+      session.mode === "pve"
+        ? `<@${userId}> có ${totalScore} điểm, phần thưởng ${label} là 🪙 ${pointReward} Xu${index === 0 && leaderBonusXu > 0 ? `, thưởng thắng bot +🪙 ${leaderBonusXu} Xu` : ""}. +${xpGain} XP. Tổng nhận: 🪙 ${totalReward} Xu. Số dư hiện tại: 🪙 ${balance} Xu.`
+        : `<@${userId}> có ${totalScore} điểm, phần thưởng ${label} là 🪙 ${pointReward} Xu${index === 0 && leaderBonusXu > 0 ? `, thưởng đứng đầu +🪙 ${leaderBonusXu} Xu` : ""}. +${xpGain} XP. Tổng nhận: 🪙 ${totalReward} Xu. Số dư hiện tại: 🪙 ${balance} Xu.`
+    );
+  }
+
+  if (deltaOnly) {
+    session.rewardedScores = cloneScoreMap(session.scores);
+    session.lastRewardMoveCount = session.moveCount;
+  }
+
+  return rewardLines.length > 0 ? { rewarded: true, lines: rewardLines } : { rewarded: false, lines: ["Không có mốc thưởng nào được kích hoạt."] };
+}
+
+async function maybeAwardPvpCheckpoint(channel, session) {
+  if (session.mode !== "pvp") {
+    return null;
+  }
+  if (session.moveCount - (session.lastRewardMoveCount || 0) < PVP_CHECKPOINT_INTERVAL) {
+    return null;
+  }
+
+  const rewardResult = await rewardRankingSnapshot(session, {
+    deltaOnly: true,
+    leaderBonusXu: PVP_CHECKPOINT_LEADER_BONUS_XU,
+    leaderBonusXp: Math.floor(WORD_CHAIN_WIN_BONUS_XP / 2),
+    type: "word_chain_checkpoint_reward",
+    label: `mốc ${session.moveCount} lượt`
+  });
+
+  if (!rewardResult?.rewarded) {
+    session.lastRewardMoveCount = session.moveCount;
+    session.rewardedScores = cloneScoreMap(session.scores);
+    return rewardResult;
+  }
+
+  await channel
+    .send(`🏁 Đã chốt thưởng giữa trận ở mốc **${session.moveCount} lượt**. ${rewardResult.lines.join(" ")}`)
+    .catch(() => {});
+  return rewardResult;
 }
 
 function startSession({ guildId, channelId, channelName, hostUserId, hostUsername, seedPhrase, mode }) {
@@ -608,6 +738,7 @@ async function applyAcceptedPhrase({ session, channel, userId, username, phrase,
   }
   pushRecentPhrase(session.guildId, phrase);
   await sendOrRefreshStatusMessage(channel, session, { accent: 0x2ecc71, lastMoveLine: `${actorLabel} trả lời đúng với **${phrase}**.` });
+  await maybeAwardPvpCheckpoint(channel, session);
 }
 
 async function endSessionWithMessage(channel, session, reply) {
@@ -680,50 +811,13 @@ async function distributeFinalRewards(session) {
   if (!session) {
     return { rewarded: false, lines: ["Không có ván nào để phát thưởng."] };
   }
-  const ranked = [...session.scores.entries()]
-    .filter(([userId]) => userId !== BOT_PVE_USER_ID)
-    .sort((a, b) => b[1] - a[1]);
-
-  if (session.mode === "pvp" && ranked.length < MIN_PVP_REWARDED_PLAYERS) {
-    return { rewarded: false, lines: [`PvP chỉ phát thưởng khi có ít nhất ${MIN_PVP_REWARDED_PLAYERS} người chơi có điểm hợp lệ.`] };
-  }
-  if (ranked.length === 0) {
-    return { rewarded: false, lines: ["Ván này chưa có ai đạt điều kiện nhận thưởng."] };
-  }
-
-  const rewardLines = [];
-  for (let index = 0; index < ranked.length; index += 1) {
-    const [userId, score] = ranked[index];
-    const username = session.usernames.get(userId) || `user-${userId}`;
-    const pointReward = score * (session.mode === "pve" ? PVE_POINT_REWARD_XU : PVP_POINT_REWARD_XU);
-    let totalReward = pointReward;
-    let xpGain = score * WORD_CHAIN_POINT_XP;
-    if (session.mode === "pvp" && index === 0) {
-      totalReward += PVP_WIN_BONUS_XU;
-      xpGain += WORD_CHAIN_WIN_BONUS_XP;
-    }
-    if (session.mode === "pve" && index === 0) {
-      totalReward += PVE_WIN_BONUS_XU;
-      xpGain += WORD_CHAIN_WIN_BONUS_XP;
-    }
-    if (totalReward <= 0) {
-      continue;
-    }
-    const updatedPlayer = await rewardPlayer(userId, username, totalReward, xpGain, "word_chain_final_reward");
-    const balance = updatedPlayer?.wallet?.xu ?? totalReward;
-    updateWordChainRanking(userId, username, session.mode, {
-      wins: index === 0 ? 1 : 0,
-      points: score,
-      games: 1
-    });
-    rewardLines.push(
-      session.mode === "pve"
-        ? `<@${userId}> có ${score} điểm, nhận 🪙 ${pointReward} Xu${index === 0 ? `, thưởng thắng bot +🪙 ${PVE_WIN_BONUS_XU} Xu` : ""}. +${xpGain} XP. Tổng thưởng: 🪙 ${totalReward} Xu. Số dư hiện tại: 🪙 ${balance} Xu.`
-        : `<@${userId}> có ${score} điểm, nhận 🪙 ${pointReward} Xu${index === 0 ? `, thưởng đứng đầu +🪙 ${PVP_WIN_BONUS_XU} Xu` : ""}. +${xpGain} XP. Tổng thưởng: 🪙 ${totalReward} Xu. Số dư hiện tại: 🪙 ${balance} Xu.`
-    );
-  }
-
-  return rewardLines.length > 0 ? { rewarded: true, lines: rewardLines } : { rewarded: false, lines: ["Không có mốc thưởng nào được kích hoạt."] };
+  return rewardRankingSnapshot(session, {
+    deltaOnly: session.mode === "pvp",
+    leaderBonusXu: session.mode === "pvp" ? PVP_WIN_BONUS_XU : PVE_WIN_BONUS_XU,
+    leaderBonusXp: WORD_CHAIN_WIN_BONUS_XP,
+    type: "word_chain_final_reward",
+    label: "kết ván"
+  });
 }
 
 async function handlePvpLobbyInteraction(interaction) {
@@ -872,5 +966,6 @@ module.exports = {
   chooseBotReply,
   findPlayablePhraseForToken,
   countAvailableFollowups,
-  findDeadEndPhraseForSession
+  findDeadEndPhraseForSession,
+  maybeAwardPvpCheckpoint
 };

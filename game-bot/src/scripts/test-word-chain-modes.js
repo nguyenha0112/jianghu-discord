@@ -1,5 +1,7 @@
 const { disableRoom, enableRoom } = require("../storage/word-chain-room-store");
 const {
+  maybeAwardPvpCheckpoint,
+  distributeFinalRewards,
   findPlayablePhraseForToken,
   getSessionStatus,
   handleWordChainMessage,
@@ -162,12 +164,56 @@ async function runTextCommandFlow() {
   return { unknownCommandHelp: true, playStartsGame: true, rankWorks: true, stopEndsRound: true };
 }
 
+async function runPvpCheckpointRewardFlow() {
+  const channel = new FakeChannel("test-pvp-checkpoint-room", "pvp-checkpoint-room");
+  const session = {
+    mode: "pvp",
+    moveCount: 25,
+    lastRewardMoveCount: 0,
+    scores: new Map([
+      ["u20", 14],
+      ["u21", 11]
+    ]),
+    rewardedScores: new Map(),
+    usernames: new Map([
+      ["u20", "Lead"],
+      ["u21", "Rival"]
+    ])
+  };
+
+  const checkpointReward = await maybeAwardPvpCheckpoint(channel, session);
+  if (!checkpointReward?.rewarded) {
+    throw new Error("Checkpoint reward did not trigger");
+  }
+  if ((session.lastRewardMoveCount || 0) !== 25) {
+    throw new Error("Checkpoint reward did not update lastRewardMoveCount");
+  }
+  if ((session.rewardedScores?.size || 0) < 2) {
+    throw new Error("Checkpoint rewarded scores were not snapshotted");
+  }
+  if (channel.sent.length === 0) {
+    throw new Error("Checkpoint reward did not send announcement");
+  }
+
+  session.moveCount = 31;
+  session.scores.set("u20", 17);
+  session.scores.set("u21", 13);
+
+  const finalReward = await distributeFinalRewards(session);
+  if (!finalReward?.lines?.length) {
+    throw new Error("Final reward did not return lines after checkpoint");
+  }
+
+  return { checkpointAwarded: true, finalRewardLines: finalReward.lines.length, announcements: channel.sent.length };
+}
+
 async function main() {
   const pvp = await runPvpFlow();
   const pve = await runPveFlow();
   const textCommands = await runTextCommandFlow();
+  const pvpCheckpoint = await runPvpCheckpointRewardFlow();
 
-  console.log(JSON.stringify({ ok: true, pvp, pve, textCommands }, null, 2));
+  console.log(JSON.stringify({ ok: true, pvp, pve, textCommands, pvpCheckpoint }, null, 2));
   process.exit(0);
 }
 
