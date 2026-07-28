@@ -2,37 +2,46 @@ module.exports = [
   {
     shopId: "basic_bait_bundle",
     itemId: "basic_bait",
-    name: "Basic Bait Bundle",
+    name: "Mồi Linh Câu",
     currency: "xu",
-    price: 30,
+    price: 45,
     quantity: 1,
-    description: "Vat pham tieu hao cho nghe Fishing."
+    description: "Vật phẩm tiêu hao cho Ngư Đạo."
   },
   {
     shopId: "simple_pickaxe",
     itemId: "simple_pickaxe",
-    name: "Simple Pickaxe",
+    name: "Thiết Cuốc",
     currency: "xu",
-    price: 140,
+    price: 220,
     quantity: 1,
-    description: "Cong cu co ban cho Mining."
+    description: "Công cụ cơ bản cho Khoáng Đạo."
   },
   {
     shopId: "field_kit",
     itemId: "field_kit",
-    name: "Field Kit",
+    name: "Sơn Dã Trang Bị",
     currency: "xu",
-    price: 110,
+    price: 180,
     quantity: 1,
-    description: "Bo dung cu da nang cho nguoi moi bat dau."
+    description: "Bộ dụng cụ đa năng cho tu sĩ mới nhập đạo."
   },
   {
     shopId: "jade_token",
     itemId: "jade_token",
-    name: "Jade Token",
+    name: "Ngọc Bài",
     currency: "ngoc",
-    price: 5,
+    price: 8,
     quantity: 1,
-    description: "Vat pham prestige tam thoi de mo rong he thong sau."
+    description: "Vật phẩm quý hiếm dùng cho hệ prestige và lễ nghi tông môn."
+  },
+  {
+    shopId: "spirit_stone_bundle",
+    itemId: "spirit_stone",
+    name: "Linh Thạch",
+    currency: "ngoc",
+    price: 2,
+    quantity: 1,
+    description: "Tài nguyên linh khí dùng trong đột phá cảnh giới."
   }
 ];

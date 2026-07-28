@@ -1,5 +1,6 @@
 const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { getWalletSummary } = require("../services/game-service");
+const { buildProgressBar, emojiToTwemojiUrl } = require("../lib/ui-theme");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -9,16 +10,20 @@ module.exports = {
     const summary = await getWalletSummary(interaction.user.id, interaction.user.username);
 
     const embed = new EmbedBuilder()
-      .setTitle(`${interaction.user.username} - Wallet`)
+      .setColor(0xf1c40f)
+      .setTitle(`🪙 ${interaction.user.username} • Linh Khố`)
+      .setThumbnail(emojiToTwemojiUrl("🪙"))
+      .setDescription(
+        [
+          `**Xu:** 🪙 **${summary.wallet.xu}**`,
+          `**Ngọc:** 💎 **${summary.wallet.ngoc}**`,
+          `**Tiến độ cấp nhân vật:** \`${buildProgressBar(summary.stats.playerXp, 100)}\` ${summary.stats.playerXp}/100 XP`
+        ].join("\n")
+      )
       .addFields(
-        { name: "Xu", value: String(summary.wallet.xu), inline: true },
-        { name: "Ngoc", value: String(summary.wallet.ngoc), inline: true },
-        { name: "Player Level", value: String(summary.stats.playerLevel), inline: true },
-        { name: "Player XP", value: String(summary.stats.playerXp), inline: true },
-        { name: "Tong Xu da kiem", value: String(summary.stats.totalXuEarned), inline: true },
-        { name: "Tong Ngoc da kiem", value: String(summary.stats.totalNgocEarned), inline: true },
-        { name: "Lan di lam", value: String(summary.stats.totalWorkActions), inline: true },
-        { name: "Vat pham da ban", value: String(summary.stats.totalItemsSold), inline: true }
+        { name: "🧍 Nhân vật", value: `Level: **${summary.stats.playerLevel}**\nXP: **${summary.stats.playerXp}**`, inline: true },
+        { name: "📈 Tích lũy", value: `Tổng Xu: **${summary.stats.totalXuEarned}**\nTổng Ngọc: **${summary.stats.totalNgocEarned}**`, inline: true },
+        { name: "🛠️ Hoạt động", value: `Đi làm: **${summary.stats.totalWorkActions}**\nĐã bán: **${summary.stats.totalItemsSold}**`, inline: true }
       )
       .setFooter({
         text: `${summary.currencies.xu.description} | ${summary.currencies.ngoc.description}`

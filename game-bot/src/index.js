@@ -3,7 +3,13 @@ require("dotenv").config();
 const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
-const { handleWordChainMessage } = require("./services/word-chain-service");
+const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
+const {
+  handleMessage: handleTaiXiuMessage,
+  handleBetButtonInteraction,
+  handleBetModalInteraction
+} = require("./services/taixiu-service");
+const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 
 const token = process.env.DISCORD_TOKEN;
 const runtimeDir = path.join(__dirname, "..", "data", "runtime");
@@ -84,6 +90,34 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isButton()) {
+    const handled = await handlePvpLobbyInteraction(interaction).catch((error) => {
+      console.error("PvP lobby interaction failed", error);
+      return false;
+    });
+    if (handled) {
+      return;
+    }
+
+    const taiXiuHandled = await handleBetButtonInteraction(interaction).catch((error) => {
+      console.error("Tai Xiu button interaction failed", error);
+      return false;
+    });
+    if (taiXiuHandled) {
+      return;
+    }
+  }
+
+  if (interaction.isModalSubmit()) {
+    const taiXiuModalHandled = await handleBetModalInteraction(interaction).catch((error) => {
+      console.error("Tai Xiu modal interaction failed", error);
+      return false;
+    });
+    if (taiXiuModalHandled) {
+      return;
+    }
+  }
+
   if (!interaction.isChatInputCommand()) {
     return;
   }
@@ -116,12 +150,13 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   const result = await handleWordChainMessage(message);
-  if (!result) {
+  const finalResult = result || (await handleVietnameseKingMessage(message)) || (await handleTaiXiuMessage(message));
+  if (!finalResult) {
     return;
   }
 
   const reaction =
-    result.react || (result.skipReaction ? null : result.ok ? "success" : "failure");
+    finalResult.react || (finalResult.skipReaction ? null : finalResult.ok ? "success" : "failure");
 
   if (reaction === "success") {
     await message.react("✅").catch(() => {});
@@ -129,8 +164,8 @@ client.on(Events.MessageCreate, async (message) => {
     await message.react("❌").catch(() => {});
   }
 
-  if (result.reply && !result.silent) {
-    await message.reply(result.reply).catch(() => {});
+  if (finalResult.reply && !finalResult.silent) {
+    await message.reply(finalResult.reply).catch(() => {});
   }
 });
 

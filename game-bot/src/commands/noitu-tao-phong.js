@@ -31,7 +31,7 @@ module.exports = {
       });
 
       if (interaction.channel && "setTopic" in interaction.channel && typeof interaction.channel.setTopic === "function") {
-        const nextTopic = `Phong noi tu ${mode.toUpperCase()}: !batdau de mo van, !stop de tam dung, !play de tiep tuc.`;
+        const nextTopic = `Nối Từ ${mode.toUpperCase()} | !play mở ván | !trangthai xem bảng | !stop kết thúc | !help xem luật`;
         await interaction.channel.setTopic(nextTopic).catch(() => {});
       }
 

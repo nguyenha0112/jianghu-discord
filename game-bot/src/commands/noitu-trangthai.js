@@ -19,7 +19,7 @@ module.exports = {
     }
 
     const embed = buildStatusEmbed(session, {
-      accent: session.paused ? 0xf39c12 : 0x2ecc71,
+      accent: 0x2ecc71,
       lastMoveLine: "Đây là trạng thái hiện tại của ván."
     });
 

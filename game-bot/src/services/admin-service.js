@@ -1,6 +1,8 @@
 const { assertAdmin } = require("../lib/admin-auth");
 const playerStore = require("../storage/player-store");
 const supabaseStore = require("../storage/supabase-store");
+const { getCandidateSummary, listCandidates } = require("../storage/vietnamese-king-candidate-store");
+const monthlyRewardService = require("./monthly-reward-service");
 
 async function getAdminPlayerView(requestUserId, targetUserId) {
   assertAdmin(requestUserId);
@@ -46,8 +48,19 @@ async function resetPlayerData(requestUserId, targetUserId) {
   };
 }
 
+function getVietnameseKingPendingCandidates(requestUserId, limit = 10) {
+  assertAdmin(requestUserId);
+  return {
+    summary: getCandidateSummary(),
+    items: listCandidates({ status: "pending", limit })
+  };
+}
+
 module.exports = {
   getAdminPlayerView,
   getRecentTransactions,
-  resetPlayerData
+  resetPlayerData,
+  getVietnameseKingPendingCandidates,
+  getMonthlyRewardStatus: monthlyRewardService.getMonthlyRewardStatus,
+  awardMonthlyReward: monthlyRewardService.awardMonthlyReward
 };

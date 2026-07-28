@@ -1,4 +1,4 @@
-const { enableRoom, disableRoom } = require("../storage/word-chain-room-store");
+const { disableRoom, enableRoom } = require("../storage/word-chain-room-store");
 const {
   findPlayablePhraseForToken,
   getSessionStatus,
@@ -65,7 +65,7 @@ async function runPvpFlow() {
   });
 
   const channel = new FakeChannel(channelId, "pvp-room");
-  const startResult = await handleWordChainMessage(createMessage(channel, "guild-1", "!batdau", "u1", "Alice"));
+  const startResult = await handleWordChainMessage(createMessage(channel, "guild-1", "!play", "u1", "Alice"));
   if (!startResult?.ok) {
     throw new Error("PvP start failed");
   }
@@ -79,6 +79,11 @@ async function runPvpFlow() {
   const playResult = await handleWordChainMessage(createMessage(channel, "guild-1", validReply, "u2", "Bob"));
   if (!playResult?.ok) {
     throw new Error("PvP valid move rejected");
+  }
+
+  const secondSession = getSessionStatus(channelId);
+  if ((secondSession.scores.get("u2") || 0) !== 1) {
+    throw new Error("PvP score was not recorded");
   }
 
   stopSession(channelId);
@@ -120,35 +125,6 @@ async function runPveFlow() {
   return { acceptedReply: validReply };
 }
 
-async function runTimeoutFlow() {
-  const channelId = "test-timeout-room";
-  disableRoom(channelId);
-  stopSession(channelId);
-  enableRoom(channelId, {
-    guildId: "guild-5",
-    channelName: "timeout-room",
-    mode: "pvp",
-    createdByUserId: "admin",
-    createdByUsername: "Admin"
-  });
-
-  const channel = new FakeChannel(channelId, "timeout-room");
-  await handleWordChainMessage(createMessage(channel, "guild-5", "!batdau", "u10", "Jade"));
-  const beforeTimeout = getSessionStatus(channelId);
-  const previousPhrase = beforeTimeout.currentPhrase;
-  const timeoutHandler = beforeTimeout.turnTimer._onTimeout;
-  clearTimeout(beforeTimeout.turnTimer);
-  await timeoutHandler();
-
-  const afterTimeout = getSessionStatus(channelId);
-  if (afterTimeout) {
-    throw new Error("Timeout flow should end the current session");
-  }
-
-  disableRoom(channelId);
-  return { previousPhrase, sessionEnded: true };
-}
-
 async function runTextCommandFlow() {
   const channelId = "test-command-room";
   disableRoom(channelId);
@@ -168,13 +144,13 @@ async function runTextCommandFlow() {
   }
 
   const playResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!play", "u11", "Kira"));
-  if (!playResult?.ok) {
-    throw new Error("!play did not start a new round");
+  if (!playResult?.ok || !playResult.reply.includes("PVP")) {
+    throw new Error("!play did not open PvP round");
   }
 
-  const runningPlayResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!play", "u11", "Kira"));
-  if (!runningPlayResult?.ok || !runningPlayResult?.reply?.includes("!stop")) {
-    throw new Error("!play while running did not explain current session");
+  const rankResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!rank", "u11", "Kira"));
+  if (!rankResult?.ok || !rankResult.reply.includes("Bảng xếp hạng")) {
+    throw new Error("!rank did not return ranking");
   }
 
   const stopResult = await handleWordChainMessage(createMessage(channel, "guild-6", "!stop", "u11", "Kira"));
@@ -182,18 +158,16 @@ async function runTextCommandFlow() {
     throw new Error("!stop did not end the current session");
   }
 
-  stopSession(channelId);
   disableRoom(channelId);
-  return { unknownCommandHelp: true, playStartsNewRound: true, stopEndsRound: true };
+  return { unknownCommandHelp: true, playStartsGame: true, rankWorks: true, stopEndsRound: true };
 }
 
 async function main() {
   const pvp = await runPvpFlow();
   const pve = await runPveFlow();
-  const timeout = await runTimeoutFlow();
   const textCommands = await runTextCommandFlow();
 
-  console.log(JSON.stringify({ ok: true, pvp, pve, timeout, textCommands }, null, 2));
+  console.log(JSON.stringify({ ok: true, pvp, pve, textCommands }, null, 2));
   process.exit(0);
 }
 

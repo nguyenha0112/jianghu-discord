@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-28",
+  "sourceFolder": "C:/Users/Admin/Downloads/Wabbit NTH",
+  "notes": [
+    "Manifest nay dung de map asset khach hang gui -> item/profession/reward trong bot.",
+    "Khong dua asset vao production cho den khi owner xac nhan quyen su dung va ten hien thi chinh thuc."
+  ],
+  "assets": [
+    {
+      "id": "reward_chest_001",
+      "type": "reward_chest",
+      "label": "Ruong Qua Tang",
+      "sourceFile": "Rương Quà Tặng.png",
+      "sourcePath": "C:/Users/Admin/Downloads/Wabbit NTH/Rương Quà Tặng.png",
+      "status": "pending_owner_confirmation",
+      "intendedUsage": [
+        "monthly_reward",
+        "special_reward",
+        "shop_banner"
+      ],
+      "mappedEntityId": "monthly_reward_chest",
+      "notes": "Asset dang ruong thuong / chest. Co the dung cho monthly reward hoac event chest."
+    },
+    {
+      "id": "profession_cooking_001",
+      "type": "profession_icon",
+      "label": "Nghe Nghiep Nau An",
+      "sourceFile": "NGHE NGHIEP NAU AN.png",
+      "sourcePath": "C:/Users/Admin/Downloads/Wabbit NTH/NGHE NGHIEP NAU AN.png",
+      "status": "pending_owner_confirmation",
+      "intendedUsage": [
+        "profession_menu",
+        "profile_card",
+        "profession_badge"
+      ],
+      "mappedEntityId": "profession_cooking",
+      "notes": "Icon nghe nau an. Nen duoc doi ten asset chuan khi dua vao production."
+    },
+    {
+      "id": "item_scroll_001",
+      "type": "item_icon",
+      "label": "Dan Lo Thiep",
+      "sourceFile": "DAN LO THIEP.png",
+      "sourcePath": "C:/Users/Admin/Downloads/Wabbit NTH/DAN LO THIEP.png",
+      "status": "needs_name_confirmation",
+      "intendedUsage": [
+        "recipe_item",
+        "quest_item",
+        "exchange_item"
+      ],
+      "mappedEntityId": "item_dan_lo_thiep",
+      "notes": "Ten hien thi va nghia ingame can owner chot lai truoc khi seed vao he thong item."
+    }
+  ]
+}

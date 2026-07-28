@@ -69,3 +69,8 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Chuyen player va transaction storage sang Supabase
 - [x] Chuyen inventory/runtime hoan toan sang Supabase that
 - [x] Game hoa phong noi tu
+- [x] Tai lieu hoa requirement khach hang vao repo
+- [x] Tao bang traceability requirement -> implementation
+- [x] Asset manifest cho icon / item / profession
+- [x] Monthly reward workflow MVP
+- [ ] Noi Tu strict config / allowlist

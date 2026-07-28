@@ -1,0 +1,75 @@
+const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
+const { exploreSecretRealm, getSecretRealmListings } = require("../services/game-service");
+const { emojiToTwemojiUrl, formatItemLabel } = require("../lib/ui-theme");
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName("bicanh")
+    .setDescription("Thám hiểm bí cảnh, đánh quái hoặc khiêu chiến boss.")
+    .addStringOption((option) =>
+      option
+        .setName("realm_id")
+        .setDescription("ID bí cảnh muốn thám hiểm")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("che_do")
+        .setDescription("Chọn đánh quái thường hoặc boss")
+        .setRequired(false)
+        .addChoices(
+          { name: "Quái thường", value: "thuong" },
+          { name: "Boss", value: "boss" }
+        )
+    ),
+  async execute(interaction) {
+    const realmId = interaction.options.getString("realm_id");
+    const mode = interaction.options.getString("che_do") || "thuong";
+
+    if (realmId) {
+      const result = await exploreSecretRealm(interaction.user.id, interaction.user.username, realmId, mode);
+      await interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(result.ok ? (mode === "boss" ? 0xc0392b : 0x3498db) : 0xe74c3c)
+            .setTitle(result.ok ? (mode === "boss" ? "👹 Khiêu Chiến Boss Bí Cảnh" : "🌌 Thám Hiểm Bí Cảnh") : "🌌 Không Thể Vào Bí Cảnh")
+            .setThumbnail(emojiToTwemojiUrl(mode === "boss" ? "👹" : "🌌"))
+            .setDescription(result.message)
+            .addFields(
+              result.ok
+                ? [
+                    { name: "🎯 Mục tiêu", value: `${result.battle.target.emoji} ${result.battle.target.name}`, inline: true },
+                    { name: "⚔️ Giao chiến", value: `${result.battle.rounds} lượt`, inline: true },
+                    { name: "💥 Lực chiến", value: `${result.battle.combat.power}`, inline: true },
+                    { name: "🪙 Thu hoạch", value: `+${result.reward.xuGain} Xu`, inline: true },
+                    { name: "🎁 Dị bảo", value: formatItemLabel(result.reward.itemId, result.reward.quantity), inline: true },
+                    { name: "⚡ Tu vi", value: `+${result.reward.playerXpGain} XP`, inline: true },
+                    { name: "📜 Chiến báo", value: result.battle.logs.join("\n"), inline: false }
+                  ]
+                : []
+            )
+        ]
+      });
+      return;
+    }
+
+    const listings = getSecretRealmListings();
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x34495e)
+          .setTitle("🌌 Danh Sách Bí Cảnh")
+          .setThumbnail(emojiToTwemojiUrl("🌌"))
+          .setDescription(
+            listings
+              .map(
+                (entry) =>
+                  `\`${entry.realmId}\`\n**${entry.name}**\nQuái canh giữ: ${entry.monster.emoji} **${entry.monster.name}**\nBoss: ${entry.boss.emoji} **${entry.boss.name}**\nYêu cầu: cảnh giới bậc **${entry.minRealmIndex + 1}** trở lên\nHồi lại: **${entry.cooldownHours} giờ**`
+              )
+              .join("\n\n")
+          )
+          .setFooter({ text: "Dùng /bicanh realm_id:<id> che_do:boss để đánh boss hoặc che_do:thuong để farm quái." })
+      ]
+    });
+  }
+};
