@@ -15,6 +15,9 @@ const { addPlayerXp, applyPlayerXp } = require("../lib/player-progression");
 
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const WORK_COOLDOWN_MS = 60 * 60 * 1000;
+const DAILY_BASE_XU = 45;
+const DAILY_DWELLING_XU = 5;
+const DAILY_BASE_NGOC = 1;
 
 function getNow() {
   return Date.now();
@@ -233,8 +236,8 @@ async function claimDaily(userId, username) {
 
   const cultivation = ensureCultivation(player);
   const dwelling = getCurrentDwelling(player);
-  const xuGain = 100 + cultivation.dwellingLevel * 10;
-  const ngocGain = 3;
+  const xuGain = DAILY_BASE_XU + cultivation.dwellingLevel * DAILY_DWELLING_XU;
+  const ngocGain = DAILY_BASE_NGOC + Math.floor((cultivation.dwellingLevel - 1) / 3);
   const playerXpResult = applyPlayerXp(
     {
       ...player.stats,

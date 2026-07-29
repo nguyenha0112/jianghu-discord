@@ -3,7 +3,7 @@ module.exports = {
     name: "Ngư Đạo",
     rewardText: "Bạn thả linh câu bên hàn đàm và thu được thủy bảo.",
     xpGain: 14,
-    xuRange: [14, 24],
+    xuRange: [22, 34],
     drops: [
       { itemId: "river_fish", quantity: 1, weight: 58 },
       { itemId: "fresh_shrimp", quantity: 1, weight: 22 },
@@ -15,7 +15,7 @@ module.exports = {
     name: "Khoáng Đạo",
     rewardText: "Bạn đào linh khoáng trong mạch núi và thu được vật liệu quý.",
     xpGain: 16,
-    xuRange: [16, 26],
+    xuRange: [24, 36],
     drops: [
       { itemId: "iron_ore", quantity: 1, weight: 55 },
       { itemId: "crystal_shard", quantity: 1, weight: 20 },
@@ -27,7 +27,7 @@ module.exports = {
     name: "Thảo Đạo",
     rewardText: "Bạn trèo núi hái linh thảo, góp nhặt khí tức thiên địa.",
     xpGain: 13,
-    xuRange: [13, 22],
+    xuRange: [20, 32],
     drops: [
       { itemId: "wild_herb", quantity: 1, weight: 45 },
       { itemId: "forest_fiber", quantity: 1, weight: 25 },
@@ -39,7 +39,7 @@ module.exports = {
     name: "Đan Đạo",
     rewardText: "Bạn luyện đan trong động phủ, ngưng tụ dược lực thành linh vật.",
     xpGain: 17,
-    xuRange: [16, 25],
+    xuRange: [23, 35],
     drops: [
       { itemId: "catalyst_powder", quantity: 1, weight: 45 },
       { itemId: "minor_elixir", quantity: 1, weight: 30 },
@@ -51,7 +51,7 @@ module.exports = {
     name: "Cổ Tu Đạo",
     rewardText: "Bạn khai quật bí cảnh cổ, nhặt được dị bảo bị chôn vùi từ lâu.",
     xpGain: 18,
-    xuRange: [18, 28],
+    xuRange: [26, 38],
     drops: [
       { itemId: "old_coin", quantity: 1, weight: 45 },
       { itemId: "relic_fragment", quantity: 1, weight: 25 },

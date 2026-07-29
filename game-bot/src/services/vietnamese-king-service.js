@@ -21,8 +21,8 @@ const HINT_KEYWORDS = new Set(["!goiy", "!hint"]);
 const RANK_KEYWORDS = new Set(["!rank", "!bxh", "!xephang"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 
-const POINT_REWARD_XU = 15;
-const WIN_BONUS_XU = 25;
+const POINT_REWARD_XU = 8;
+const WIN_BONUS_XU = 20;
 const POINT_REWARD_XP = 5;
 const WIN_BONUS_XP = 15;
 const MAX_RECENT_PUZZLES = 30;

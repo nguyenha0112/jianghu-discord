@@ -53,7 +53,7 @@ Cap nhat lan cuoi: 2026-07-29
 - [x] Crafting MVP
 - [x] Tu tien foundation
 - [x] Bi canh / dong phu / phap bao foundation
-- [ ] Currency sink balancing v1
+- [x] Currency sink balancing v1
 - [ ] Reward scaling / anti-farm balancing v1
 
 ## Discord Runtime
