@@ -9,6 +9,15 @@ const {
   handleBetButtonInteraction,
   handleBetModalInteraction
 } = require("./services/taixiu-service");
+const {
+  handleMessage: handleBauCuaMessage,
+  handleButtonInteraction: handleBauCuaButtonInteraction,
+  handleModalInteraction: handleBauCuaModalInteraction
+} = require("./services/baucua-service");
+const {
+  handleMessage: handleXiDachMessage,
+  handleButtonInteraction: handleXiDachButtonInteraction
+} = require("./services/xidach-service");
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 
 const token = process.env.DISCORD_TOKEN;
@@ -112,6 +121,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (taiXiuHandled) {
       return;
     }
+
+    const bauCuaHandled = await handleBauCuaButtonInteraction(interaction).catch((error) => {
+      console.error("Bau Cua button interaction failed", error);
+      return false;
+    });
+    if (bauCuaHandled) {
+      return;
+    }
+
+    const xiDachHandled = await handleXiDachButtonInteraction(interaction).catch((error) => {
+      console.error("Xi Dach button interaction failed", error);
+      return false;
+    });
+    if (xiDachHandled) {
+      return;
+    }
   }
 
   if (interaction.isModalSubmit()) {
@@ -120,6 +145,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return false;
     });
     if (taiXiuModalHandled) {
+      return;
+    }
+
+    const bauCuaModalHandled = await handleBauCuaModalInteraction(interaction).catch((error) => {
+      console.error("Bau Cua modal interaction failed", error);
+      return false;
+    });
+    if (bauCuaModalHandled) {
       return;
     }
   }
@@ -156,7 +189,12 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   const result = await handleWordChainMessage(message);
-  const finalResult = result || (await handleVietnameseKingMessage(message)) || (await handleTaiXiuMessage(message));
+  const finalResult =
+    result ||
+    (await handleVietnameseKingMessage(message)) ||
+    (await handleTaiXiuMessage(message)) ||
+    (await handleBauCuaMessage(message)) ||
+    (await handleXiDachMessage(message));
   if (!finalResult) {
     return;
   }
