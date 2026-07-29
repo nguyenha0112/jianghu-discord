@@ -19,6 +19,10 @@ module.exports = {
     ),
   async execute(interaction) {
     try {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+
       assertCanManageGameRoom(interaction);
       const mode = interaction.options.getString("che_do", true);
 
@@ -35,7 +39,7 @@ module.exports = {
         await interaction.channel.setTopic(nextTopic).catch(() => {});
       }
 
-      await interaction.reply(`Đã bật kênh này thành phòng chơi nối từ ${mode.toUpperCase()}.`);
+      await interaction.editReply(`Đã bật kênh này thành phòng chơi nối từ ${mode.toUpperCase()}.`);
       await interaction.channel.send({
         embeds: [
           {
@@ -46,7 +50,11 @@ module.exports = {
         ]
       });
     } catch (error) {
-      await interaction.reply({ content: error.message, ephemeral: true });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: error.message });
+      } else {
+        await interaction.reply({ content: error.message, ephemeral: true });
+      }
     }
   }
 };

@@ -20,6 +20,16 @@ const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
 const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
 const PROFILE_KEYWORDS = new Set(["!me", "!toi", "!thongke"]);
+const TEXT_COMMAND_ALIASES = new Map([
+  ["!play", "Mở bảng chọn mức cược"],
+  ["!play 1000", "Vào ván ngay với mức cược cụ thể"],
+  ["!xidach 5000", "Vào ván ngay với alias Xì Dách"],
+  ["!trangthai", "Xem trạng thái ván hiện tại"],
+  ["!stop", "Hủy ván đang chơi và hoàn cược"],
+  ["!bxh", "Xem bảng xếp hạng"],
+  ["!lichsu", "Xem các ván gần đây"],
+  ["!help", "Xem hướng dẫn nhanh"]
+]);
 
 const MIN_BET = 20;
 const MAX_BET = 250000;
@@ -27,6 +37,7 @@ const WIN_XP_GAIN = 4;
 const BET_XP_GAIN = 1;
 
 const ACTION_PREFIX = "xidach:action:";
+const QUICK_BET_VALUES = [1000, 5000, 10000, 25000, 50000, 100000];
 
 const SUITS = ["♠", "♥", "♦", "♣"];
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -128,6 +139,43 @@ function buildActionComponents(session) {
   ];
 }
 
+function buildLobbyComponents(channelId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      ...QUICK_BET_VALUES.slice(0, 3).map((amount) =>
+        new ButtonBuilder()
+          .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
+          .setLabel(`🪙 ${formatNumber(amount)}`)
+          .setStyle(ButtonStyle.Primary)
+      )
+    ),
+    new ActionRowBuilder().addComponents(
+      ...QUICK_BET_VALUES.slice(3).map((amount) =>
+        new ButtonBuilder()
+          .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
+          .setLabel(`🪙 ${formatNumber(amount)}`)
+          .setStyle(ButtonStyle.Secondary)
+      )
+    )
+  ];
+}
+
+function buildLobbyEmbed(channelId) {
+  return new EmbedBuilder()
+    .setColor(0x8e44ad)
+    .setTitle("🃏 Mở Ván Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setDescription(
+      [
+        "Chọn nhanh một mức cược bên dưới để vào ván.",
+        `Cược tối thiểu: **${formatXu(MIN_BET)}**`,
+        `Cược tối đa: **${formatXu(MAX_BET)}**`,
+        "Bạn cũng có thể gõ tay như `!play 1000`."
+      ].join("\n")
+    )
+    .setFooter({ text: "Sau khi vào ván, bấm Rút hoặc Dừng để chơi." });
+}
+
 function buildStatusEmbed(session, note = "Đến lượt người chơi quyết định.") {
   const playerScore = getHandScore(session.playerCards);
   const dealerVisible = `${session.dealerCards[0].rank}${session.dealerCards[0].suit} ??`;
@@ -172,7 +220,7 @@ function buildSettlementEmbed(session, resultText) {
 
 function getHelpText() {
   return [
-    "Luật: nhắn `!play 1000` để bắt đầu một ván Xì Dách với mức cược 1000 Xu.",
+    "Luật: nhắn `!play` để mở bảng chọn mức cược, hoặc `!play 1000` để vào ván luôn.",
     "Sau đó bấm `Rút` để lấy thêm bài hoặc `Dừng` để so điểm với nhà cái.",
     "A có thể tính là 1 hoặc 11. Quá 21 là quắc ngay.",
     "Nhắn `!stop` hoặc `!out` để thoát ván đang treo.",
@@ -287,9 +335,20 @@ function buildProfileEmbed(player, username, rankingEntry) {
 function buildRoomGuideText() {
   return [
     "**Phòng Xì Dách đã sẵn sàng.**",
-    "Nhắn `!play 1000` để vào một ván mới với mức cược mong muốn.",
+    "Nhắn `!play` để mở bảng chọn mức cược, hoặc `!play 1000` để vào thẳng ván.",
     "Bấm `Rút` hoặc `Dừng` để chơi.",
     "`!trangthai` để xem lại bàn hiện tại, `!stop` để hủy ván."
+  ].join("\n");
+}
+
+function isTextCommand(raw) {
+  return typeof raw === "string" && raw.trim().startsWith("!");
+}
+
+function getAvailableTextCommandMessage() {
+  return [
+    "Lệnh chưa đúng. Bạn có thể dùng:",
+    ...[...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`)
   ].join("\n");
 }
 
@@ -311,11 +370,20 @@ async function getProfilePayload(userId, username) {
 async function adjustPlayerXu(userId, username, amount, type, extra = {}) {
   const player = await ensureWalletPlayer(userId, username);
   const xpGain = extra.xpGain || 0;
+  const safeWallet = player?.wallet || { xu: 0, ngoc: 0 };
+  const safeStats = player?.stats || {
+    playerLevel: 1,
+    playerXp: 0,
+    totalXuEarned: 0,
+    totalNgocEarned: 0,
+    totalWorkActions: 0,
+    totalItemsSold: 0
+  };
   const updated = await updatePlayer(userId, {
     username,
-    wallet: { ...player.wallet, xu: player.wallet.xu + amount },
+    wallet: { ...safeWallet, xu: safeWallet.xu + amount },
     stats: addPlayerXp(
-      { ...player.stats, totalXuEarned: player.stats.totalXuEarned + Math.max(0, amount) },
+      { ...safeStats, totalXuEarned: (safeStats.totalXuEarned || 0) + Math.max(0, amount) },
       xpGain
     )
   });
@@ -488,8 +556,8 @@ function parseActionCustomId(customId) {
     return null;
   }
   const rest = customId.slice(ACTION_PREFIX.length);
-  const [channelId, action] = rest.split(":");
-  return channelId && action ? { channelId, action } : null;
+  const [channelId, action, value] = rest.split(":");
+  return channelId && action ? { channelId, action, value } : null;
 }
 
 async function handleButtonInteraction(interaction) {
@@ -499,6 +567,29 @@ async function handleButtonInteraction(interaction) {
   }
 
   const session = sessions.get(parsed.channelId);
+  if (!session && parsed.action === "start") {
+    try {
+      const betAmount = Number(parsed.value);
+      const nextSession = await startRound({
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        channelName: interaction.channel?.name || "unknown",
+        userId: interaction.user.id,
+        username: interaction.user.username,
+        betAmount
+      });
+
+      await interaction.reply({
+        embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`)],
+        components: buildActionComponents(nextSession)
+      });
+      return true;
+    } catch (error) {
+      await interaction.reply({ content: error.message, ephemeral: true });
+      return true;
+    }
+  }
+
   if (!session) {
     await interaction.reply({ content: "Ván Xì Dách này không còn hoạt động.", ephemeral: true });
     return true;
@@ -576,6 +667,15 @@ async function handleMessage(message) {
     return { ok: true, skipReaction: true, reply: refundText };
   }
 
+  if (lowered === "!play" || lowered === "!batdau" || lowered === "!xidach") {
+    return {
+      ok: true,
+      skipReaction: true,
+      embeds: [buildLobbyEmbed(message.channel.id)],
+      components: buildLobbyComponents(message.channel.id)
+    };
+  }
+
   const startMatch = raw.match(START_RE);
   if (startMatch) {
     try {
@@ -597,6 +697,10 @@ async function handleMessage(message) {
     } catch (error) {
       return { ok: false, skipReaction: true, reply: error.message };
     }
+  }
+
+  if (isTextCommand(raw)) {
+    return { ok: false, skipReaction: true, reply: getAvailableTextCommandMessage() };
   }
 
   return null;

@@ -9,6 +9,10 @@ module.exports = {
     .setDescription("Bật kênh hiện tại thành phòng chơi Bầu Cua."),
   async execute(interaction) {
     try {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+
       assertCanManageGameRoom(interaction);
 
       enableRoom(interaction.channelId, {
@@ -23,7 +27,7 @@ module.exports = {
         await interaction.channel.setTopic(nextTopic).catch(() => {});
       }
 
-      await interaction.reply("Đã bật kênh này thành phòng chơi Bầu Cua.");
+      await interaction.editReply("Đã bật kênh này thành phòng chơi Bầu Cua.");
       await interaction.channel.send({
         embeds: [
           {
@@ -34,7 +38,11 @@ module.exports = {
         ]
       });
     } catch (error) {
-      await interaction.reply({ content: error.message, ephemeral: true });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: error.message });
+      } else {
+        await interaction.reply({ content: error.message, ephemeral: true });
+      }
     }
   }
 };
