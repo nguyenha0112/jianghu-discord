@@ -29,14 +29,14 @@ const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
 const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
 const PROFILE_KEYWORDS = new Set(["!me", "!toi", "!thongke"]);
 const TEXT_COMMAND_ALIASES = new Map([
-  ["!play", "Má»Ÿ báº£ng chá»n má»©c cÆ°á»£c"],
-  ["!play 1000", "VÃ o vÃ¡n ngay vá»›i má»©c cÆ°á»£c cá»¥ thá»ƒ"],
-  ["!xidach 5000", "VÃ o vÃ¡n ngay vá»›i alias XÃ¬ DÃ¡ch"],
-  ["!trangthai", "Xem tráº¡ng thÃ¡i vÃ¡n hiá»‡n táº¡i"],
-  ["!stop", "Há»§y vÃ¡n Ä‘ang chÆ¡i vÃ  hoÃ n cÆ°á»£c"],
-  ["!bxh", "Xem báº£ng xáº¿p háº¡ng"],
-  ["!lichsu", "Xem cÃ¡c vÃ¡n gáº§n Ä‘Ã¢y"],
-  ["!help", "Xem hÆ°á»›ng dáº«n nhanh"]
+  ["!play", "Mở bảng chọn mức cược"],
+  ["!play 1000", "Vào ván ngay với mức cược cụ thể"],
+  ["!xidach 5000", "Vào ván ngay với alias Xì Dách"],
+  ["!trangthai", "Xem trạng thái ván hiện tại"],
+  ["!stop", "Hủy ván đang chơi và hoàn cược"],
+  ["!bxh", "Xem bảng xếp hạng"],
+  ["!lichsu", "Xem các ván gần đây"],
+  ["!help", "Xem hướng dẫn nhanh"]
 ]);
 
 const MIN_BET = 20;
@@ -60,7 +60,7 @@ function formatNumber(value) {
 }
 
 function formatXu(value) {
-  return `ðŸª™ ${formatNumber(value)} Xu`;
+  return `🪙 ${formatNumber(value)} Xu`;
 }
 
 function buildDeck() {
@@ -106,7 +106,7 @@ function isNguLinh(cards) {
 }
 
 function getSuitColor(suit) {
-  return suit === "â™¥" || suit === "â™¦" ? "ðŸŸ¥" : "â¬›";
+  return suit === "♥" || suit === "♦" ? "🟥" : "⬛";
 }
 
 function padCardRank(rank) {
@@ -132,7 +132,7 @@ function mergeCardAscii(cards, options = {}) {
   }
 
   if (asciiCards.length === 0) {
-    return "`ChÆ°a cÃ³ bÃ i`";
+    return "`Chưa có bài`";
   }
 
   const lines = [];
@@ -143,9 +143,9 @@ function mergeCardAscii(cards, options = {}) {
   const suitLegend = asciiCards
     .map((_, idx) => {
       if (includeHiddenDealerCard && idx === asciiCards.length - 1) {
-        return "ðŸ‚ ";
+        return "🂠";
       }
-      return getSuitColor(cards[idx]?.suit || "â™ ");
+      return getSuitColor(cards[idx]?.suit || "♠");
     })
     .join(" ");
 
@@ -158,7 +158,7 @@ function formatCards(cards) {
 
 function formatDealerPreview(cards) {
   if (!cards.length) {
-    return "`ChÆ°a cÃ³ bÃ i`";
+    return "`Chưa có bài`";
   }
   return mergeCardAscii([cards[0]], { includeHiddenDealerCard: true });
 }
@@ -193,15 +193,15 @@ function buildActionComponents(session) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:hit`)
-        .setLabel("ðŸƒ RÃºt")
+        .setLabel("🃏 Rút")
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:stand`)
-        .setLabel("âœ‹ Dá»«ng")
+        .setLabel("✋ Dừng")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:status`)
-        .setLabel("ðŸ“œ Xem lÆ°á»£t")
+        .setLabel("📜 Xem lượt")
         .setStyle(ButtonStyle.Secondary)
     )
   ];
@@ -213,7 +213,7 @@ function buildLobbyComponents(channelId) {
       ...QUICK_BET_VALUES.slice(0, 3).map((amount) =>
         new ButtonBuilder()
           .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
-          .setLabel(`ðŸª™ ${formatNumber(amount)}`)
+          .setLabel(`🪙 ${formatNumber(amount)}`)
           .setStyle(ButtonStyle.Primary)
       )
     ),
@@ -221,12 +221,12 @@ function buildLobbyComponents(channelId) {
       ...QUICK_BET_VALUES.slice(3).map((amount) =>
         new ButtonBuilder()
           .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
-          .setLabel(`ðŸª™ ${formatNumber(amount)}`)
+          .setLabel(`🪙 ${formatNumber(amount)}`)
           .setStyle(ButtonStyle.Secondary)
       ),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${channelId}:custom`)
-        .setLabel("âœï¸ Nháº­p cÆ°á»£c")
+        .setLabel("✍️ Nhập cược")
         .setStyle(ButtonStyle.Success)
     )
   ];
@@ -235,55 +235,55 @@ function buildLobbyComponents(channelId) {
 function buildLobbyEmbed(channelId) {
   return new EmbedBuilder()
     .setColor(0x8e44ad)
-    .setTitle("ðŸƒ Má»Ÿ VÃ¡n XÃ¬ DÃ¡ch")
-    .setThumbnail(emojiToTwemojiUrl("ðŸƒ"))
+    .setTitle("🃏 Mở Ván Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(
       [
-        "Chá»n nhanh má»™t má»©c cÆ°á»£c bÃªn dÆ°á»›i Ä‘á»ƒ vÃ o vÃ¡n.",
-        `CÆ°á»£c tá»‘i thiá»ƒu: **${formatXu(MIN_BET)}**`,
-        `CÆ°á»£c tá»‘i Ä‘a: **${formatXu(MAX_BET)}**`,
-        "CÃ³ thá»ƒ báº¥m **Nháº­p cÆ°á»£c** Ä‘á»ƒ Ä‘iá»n sá»‘ tiá»n báº¥t ká»³.",
-        "Báº¡n cÅ©ng cÃ³ thá»ƒ gÃµ tay nhÆ° `!play 1000`."
+        "Chọn nhanh một mức cược bên dưới để vào ván.",
+        `Cược tối thiểu: **${formatXu(MIN_BET)}**`,
+        `Cược tối đa: **${formatXu(MAX_BET)}**`,
+        "Có thể bấm **Nhập cược** để điền số tiền bất kỳ.",
+        "Bạn cũng có thể gõ tay như `!play 1000`."
       ].join("\n")
     )
-    .setFooter({ text: "Sau khi vÃ o vÃ¡n, báº¥m RÃºt hoáº·c Dá»«ng Ä‘á»ƒ chÆ¡i." });
+    .setFooter({ text: "Sau khi vào ván, bấm Rút hoặc Dừng để chơi." });
 }
 
 function buildBetModal(channelId) {
   return new ModalBuilder()
     .setCustomId(`${MODAL_PREFIX}${channelId}`)
-    .setTitle("Nháº­p má»©c cÆ°á»£c XÃ¬ DÃ¡ch")
+    .setTitle("Nhập mức cược Xì Dách")
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId("amount")
-          .setLabel(`Nháº­p sá»‘ Xu (${MIN_BET} - ${MAX_BET})`)
-          .setPlaceholder("VÃ­ dá»¥: 12000")
+          .setLabel(`Nhập số Xu (${MIN_BET} - ${MAX_BET})`)
+          .setPlaceholder("Ví dụ: 12000")
           .setRequired(true)
           .setStyle(TextInputStyle.Short)
       )
     );
 }
 
-function buildStatusEmbed(session, note = "Äáº¿n lÆ°á»£t ngÆ°á»i chÆ¡i quyáº¿t Ä‘á»‹nh.") {
+function buildStatusEmbed(session, note = "Đến lượt người chơi quyết định.") {
   const playerScore = getHandScore(session.playerCards);
   const dealerVisible = formatDealerPreview(session.dealerCards);
 
   return new EmbedBuilder()
     .setColor(0x9b59b6)
-    .setTitle("ðŸƒ XÃ¬ DÃ¡ch Jianghu")
-    .setThumbnail(emojiToTwemojiUrl("ðŸƒ"))
+    .setTitle("🃏 Xì Dách Jianghu")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(
       [
-        `**NgÆ°á»i chÆ¡i:** <@${session.hostUserId}>`,
-        `**CÆ°á»£c:** ${formatXu(session.betAmount)}`,
-        `**Äiá»ƒm báº¡n:** ${playerScore}`,
-        `**BÃ i báº¡n:** ${formatCards(session.playerCards)}`,
-        `**BÃ i nhÃ  cÃ¡i:** ${dealerVisible}`
+        `**Người chơi:** <@${session.hostUserId}>`,
+        `**Cược:** ${formatXu(session.betAmount)}`,
+        `**Điểm bạn:** ${playerScore}`,
+        `**Bài bạn:** ${formatCards(session.playerCards)}`,
+        `**Bài nhà cái:** ${dealerVisible}`
       ].join("\n")
     )
-    .addFields({ name: "ðŸ“¢ ThÃ´ng bÃ¡o", value: note, inline: false })
-    .setFooter({ text: "Báº¥m RÃºt Ä‘á»ƒ bá»‘c thÃªm bÃ i, báº¥m Dá»«ng Ä‘á»ƒ chá»‘t Ä‘iá»ƒm vá»›i nhÃ  cÃ¡i." });
+    .addFields({ name: "📢 Thông báo", value: note, inline: false })
+    .setFooter({ text: "Bấm Rút để bốc thêm bài, bấm Dừng để chốt điểm với nhà cái." });
 }
 
 function buildSettlementEmbed(session, resultText) {
@@ -292,16 +292,16 @@ function buildSettlementEmbed(session, resultText) {
 
   return new EmbedBuilder()
     .setColor(0x8e44ad)
-    .setTitle("ðŸƒ Káº¿t Quáº£ XÃ¬ DÃ¡ch")
-    .setThumbnail(emojiToTwemojiUrl("ðŸƒ"))
+    .setTitle("🃏 Kết Quả Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(
       [
         resultText,
         "",
-        `**Báº¡n - ${playerScore}**`,
+        `**Bạn - ${playerScore}**`,
         formatCards(session.playerCards),
         "",
-        `**NhÃ  cÃ¡i - ${dealerScore}**`,
+        `**Nhà cái - ${dealerScore}**`,
         formatCards(session.dealerCards)
       ].join("\n")
     );
@@ -338,7 +338,7 @@ async function closeStatusMessage(channel, session) {
   try {
     const message = await channel.messages.fetch(session.statusMessageId);
     await message.edit({
-      embeds: [buildStatusEmbed(session, "VÃ¡n Ä‘Ã£ káº¿t thÃºc.")],
+      embeds: [buildStatusEmbed(session, "Ván đã kết thúc.")],
       components: []
     });
   } catch {
@@ -348,25 +348,25 @@ async function closeStatusMessage(channel, session) {
 
 function getHelpText() {
   return [
-    "Luáº­t: nháº¯n `!play` Ä‘á»ƒ má»Ÿ báº£ng chá»n má»©c cÆ°á»£c, hoáº·c `!play 1000` Ä‘á»ƒ vÃ o vÃ¡n luÃ´n.",
-    "Sau Ä‘Ã³ báº¥m `RÃºt` Ä‘á»ƒ láº¥y thÃªm bÃ i hoáº·c `Dá»«ng` Ä‘á»ƒ so Ä‘iá»ƒm vá»›i nhÃ  cÃ¡i.",
-    "A cÃ³ thá»ƒ tÃ­nh lÃ  1 hoáº·c 11. QuÃ¡ 21 lÃ  quáº¯c ngay.",
-    "Nháº¯n `!stop` hoáº·c `!out` Ä‘á»ƒ thoÃ¡t vÃ¡n Ä‘ang treo.",
-    "Nháº¯n `!bxh` Ä‘á»ƒ xem báº£ng xáº¿p háº¡ng, `!lichsu` Ä‘á»ƒ xem cÃ¡c vÃ¡n gáº§n Ä‘Ã¢y."
+    "Luật: nhấn `!play` để mở bảng chọn mức cược, hoặc `!play 1000` để vào ván luôn.",
+    "Sau đó bấm `Rút` để lấy thêm bài hoặc `Dừng` để so điểm với nhà cái.",
+    "A có thể tính là 1 hoặc 11. Quá 21 là quắc ngay.",
+    "Nhấn `!stop` hoặc `!out` để thoát ván đang treo.",
+    "Nhấn `!bxh` để xem bảng xếp hạng, `!lichsu` để xem các ván gần đây."
   ].join("\n");
 }
 
 function getRankingText() {
   const ranking = getXiDachRanking(10);
   if (ranking.length === 0) {
-    return "XÃ¬ DÃ¡ch chÆ°a cÃ³ dá»¯ liá»‡u xáº¿p háº¡ng.";
+    return "Xì Dách chưa có dữ liệu xếp hạng.";
   }
 
   return [
-    "**ðŸ† Báº£ng xáº¿p háº¡ng XÃ¬ DÃ¡ch**",
+    "**🏆 Bảng xếp hạng Xì Dách**",
     ...ranking.map(
       (entry, index) =>
-        `${index + 1}. <@${entry.userId}> - Tháº¯ng: ${entry.wins}, HÃ²a: ${entry.pushes}, LÃ£i: ${formatXu(entry.profitXu)}, VÃ¡n: ${entry.games}, Ä‚n Ä‘áº­m nháº¥t: ${formatXu(entry.bestWinXu)}`
+        `${index + 1}. <@${entry.userId}> - Thắng: ${entry.wins}, Hòa: ${entry.pushes}, Lãi: ${formatXu(entry.profitXu)}, Ván: ${entry.games}, Ăn đậm nhất: ${formatXu(entry.bestWinXu)}`
     )
   ].join("\n");
 }
@@ -374,14 +374,14 @@ function getRankingText() {
 function getHistoryText() {
   const history = getXiDachHistory(8);
   if (history.length === 0) {
-    return "XÃ¬ DÃ¡ch chÆ°a cÃ³ lá»‹ch sá»­ vÃ¡n nÃ o.";
+    return "Xì Dách chưa có lịch sử ván nào.";
   }
 
   return [
-    "**ðŸ§¾ Lá»‹ch sá»­ XÃ¬ DÃ¡ch gáº§n Ä‘Ã¢y**",
+    "**🧾 Lịch sử Xì Dách gần đây**",
     ...history.map(
       (entry, index) =>
-        `${index + 1}. <@${entry.userId}> | Káº¿t quáº£: ${entry.resultLabel} | CÆ°á»£c: ${formatXu(entry.betAmount)} | LÃ£i: ${formatXu(entry.netXu)} | Äiá»ƒm: ${entry.playerScore}-${entry.dealerScore}`
+        `${index + 1}. <@${entry.userId}> | Kết quả: ${entry.resultLabel} | Cược: ${formatXu(entry.betAmount)} | Lãi: ${formatXu(entry.netXu)} | Điểm: ${entry.playerScore}-${entry.dealerScore}`
     )
   ].join("\n");
 }
@@ -390,36 +390,36 @@ function buildRankingEmbed() {
   const ranking = getXiDachRanking(10);
   return new EmbedBuilder()
     .setColor(0xf1c40f)
-    .setTitle("ðŸ† Báº£ng Xáº¿p Háº¡ng XÃ¬ DÃ¡ch")
-    .setThumbnail(emojiToTwemojiUrl("ðŸƒ"))
+    .setTitle("🏆 Bảng Xếp Hạng Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(
       ranking.length > 0
         ? ranking
             .map(
               (entry, index) =>
-                `**${index + 1}.** <@${entry.userId}>\nTháº¯ng: **${entry.wins}** | HÃ²a: **${entry.pushes}** | LÃ£i: **${formatXu(entry.profitXu)}** | VÃ¡n: **${entry.games}**`
+                `**${index + 1}.** <@${entry.userId}>\nThắng: **${entry.wins}** | Hòa: **${entry.pushes}** | Lãi: **${formatXu(entry.profitXu)}** | Ván: **${entry.games}**`
             )
             .join("\n\n")
-        : "XÃ¬ DÃ¡ch chÆ°a cÃ³ dá»¯ liá»‡u xáº¿p háº¡ng."
+        : "Xì Dách chưa có dữ liệu xếp hạng."
     )
-    .setFooter({ text: "DÃ¹ng !me Ä‘á»ƒ xem thá»‘ng kÃª cÃ¡ nhÃ¢n." });
+    .setFooter({ text: "Dùng !me để xem thống kê cá nhân." });
 }
 
 function buildHistoryEmbed() {
   const history = getXiDachHistory(8);
   return new EmbedBuilder()
     .setColor(0x3498db)
-    .setTitle("ðŸ§¾ Lá»‹ch Sá»­ XÃ¬ DÃ¡ch Gáº§n ÄÃ¢y")
-    .setThumbnail(emojiToTwemojiUrl("ðŸ§¾"))
+    .setTitle("🧾 Lịch Sử Xì Dách Gần Đây")
+    .setThumbnail(emojiToTwemojiUrl("🧾"))
     .setDescription(
       history.length > 0
         ? history
             .map(
               (entry, index) =>
-                `**${index + 1}.** <@${entry.userId}>\nKáº¿t quáº£: **${entry.resultLabel}** | CÆ°á»£c: **${formatXu(entry.betAmount)}**\nLÃ£i: **${formatXu(entry.netXu)}** | Äiá»ƒm: **${entry.playerScore}-${entry.dealerScore}**`
+                `**${index + 1}.** <@${entry.userId}>\nKết quả: **${entry.resultLabel}** | Cược: **${formatXu(entry.betAmount)}**\nLãi: **${formatXu(entry.netXu)}** | Điểm: **${entry.playerScore}-${entry.dealerScore}**`
             )
             .join("\n\n")
-        : "XÃ¬ DÃ¡ch chÆ°a cÃ³ lá»‹ch sá»­ vÃ¡n nÃ o."
+        : "Xì Dách chưa có lịch sử ván nào."
     );
 }
 
@@ -433,28 +433,28 @@ function buildProfileEmbed(player, username, rankingEntry) {
 
   return new EmbedBuilder()
     .setColor(0x9b59b6)
-    .setTitle("ðŸƒ Há»“ SÆ¡ XÃ¬ DÃ¡ch")
-    .setThumbnail(emojiToTwemojiUrl("ðŸƒ"))
+    .setTitle("🃏 Hồ Sơ Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(`<@${player.userId}> - **${username}**`)
     .addFields(
       {
-        name: "ðŸª™ VÃ­ hiá»‡n táº¡i",
-        value: `Xu: **${formatXu(player.wallet.xu)}**\nNgá»c: **${formatNumber(player.wallet.ngoc)}**`,
+        name: "🪙 Ví hiện tại",
+        value: `Xu: **${formatXu(player.wallet.xu)}**\nNgọc: **${formatNumber(player.wallet.ngoc)}**`,
         inline: true
       },
       {
-        name: "ðŸŽ® ThÃ nh tÃ­ch XÃ¬ DÃ¡ch",
-        value: `VÃ¡n: **${totalGames}**\nTháº¯ng: **${wins}**\nHÃ²a: **${pushes}**\nTá»‰ lá»‡ tháº¯ng: **${winRate}%**`,
+        name: "🎮 Thành tích Xì Dách",
+        value: `Ván: **${totalGames}**\nThắng: **${wins}**\nHòa: **${pushes}**\nTỉ lệ thắng: **${winRate}%**`,
         inline: true
       },
       {
-        name: "ðŸ“ˆ Hiá»‡u suáº¥t",
-        value: `LÃ£i rÃ²ng: **${formatXu(profitXu)}**\nÄ‚n Ä‘áº­m nháº¥t: **${formatXu(bestWinXu)}**`,
+        name: "📈 Hiệu suất",
+        value: `Lãi ròng: **${formatXu(profitXu)}**\nĂn đậm nhất: **${formatXu(bestWinXu)}**`,
         inline: false
       },
       {
-        name: "âœ¨ Tu vi tá»•ng",
-        value: `Cáº¥p: **${player.stats.playerLevel}**\nXP: **${player.stats.playerXp}/100**\n${buildProgressBar(player.stats.playerXp, 100, 12)}`,
+        name: "✨ Tu vi tổng",
+        value: `Cấp: **${player.stats.playerLevel}**\nXP: **${player.stats.playerXp}/100**\n${buildProgressBar(player.stats.playerXp, 100, 12)}`,
         inline: false
       }
     );
@@ -462,10 +462,10 @@ function buildProfileEmbed(player, username, rankingEntry) {
 
 function buildRoomGuideText() {
   return [
-    "**PhÃ²ng XÃ¬ DÃ¡ch Ä‘Ã£ sáºµn sÃ ng.**",
-    "Nháº¯n `!play` Ä‘á»ƒ má»Ÿ báº£ng chá»n má»©c cÆ°á»£c, hoáº·c `!play 1000` Ä‘á»ƒ vÃ o tháº³ng vÃ¡n.",
-    "Báº¥m `RÃºt` hoáº·c `Dá»«ng` Ä‘á»ƒ chÆ¡i.",
-    "`!trangthai` Ä‘á»ƒ xem láº¡i bÃ n hiá»‡n táº¡i, `!stop` Ä‘á»ƒ há»§y vÃ¡n."
+    "**Phòng Xì Dách đã sẵn sàng.**",
+    "Nhấn `!play` để mở bảng chọn mức cược, hoặc `!play 1000` để vào thẳng ván.",
+    "Bấm `Rút` hoặc `Dừng` để chơi.",
+    "`!trangthai` để xem lại bàn hiện tại, `!stop` để hủy ván."
   ].join("\n");
 }
 
@@ -475,7 +475,7 @@ function isTextCommand(raw) {
 
 function getAvailableTextCommandMessage() {
   return [
-    "Lá»‡nh chÆ°a Ä‘Ãºng. Báº¡n cÃ³ thá»ƒ dÃ¹ng:",
+    "Lệnh chưa đúng. Bạn có thể dùng:",
     ...[...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`)
   ].join("\n");
 }
@@ -532,20 +532,20 @@ async function adjustPlayerXu(userId, username, amount, type, extra = {}) {
 
 async function startRound({ guildId, channelId, channelName, userId, username, betAmount }) {
   if (!isEnabledRoom(channelId)) {
-    throw new Error("PhÃ²ng nÃ y chÆ°a Ä‘Æ°á»£c báº­t cho XÃ¬ DÃ¡ch. HÃ£y dÃ¹ng `/xidach-tao-phong` trÆ°á»›c.");
+    throw new Error("Phòng này chưa được bật cho Xì Dách. Hãy dùng `/xidach-tao-phong` trước.");
   }
 
   if (sessions.has(channelId)) {
-    throw new Error("PhÃ²ng nÃ y Ä‘ang cÃ³ má»™t vÃ¡n XÃ¬ DÃ¡ch rá»“i. HÃ£y chÆ¡i xong hoáº·c `!stop` trÆ°á»›c.");
+    throw new Error("Phòng này đang có một ván Xì Dách rồi. Hãy chơi xong hoặc `!stop` trước.");
   }
 
   if (!Number.isInteger(betAmount) || betAmount < MIN_BET || betAmount > MAX_BET) {
-    throw new Error(`CÆ°á»£c pháº£i tá»« ${formatNumber(MIN_BET)} Ä‘áº¿n ${formatNumber(MAX_BET)} Xu.`);
+    throw new Error(`Cược phải từ ${formatNumber(MIN_BET)} đến ${formatNumber(MAX_BET)} Xu.`);
   }
 
   const player = await ensureWalletPlayer(userId, username);
   if (player.wallet.xu < betAmount) {
-    throw new Error(`Báº¡n khÃ´ng Ä‘á»§ Xu Ä‘á»ƒ cÆ°á»£c. Sá»‘ dÆ° hiá»‡n táº¡i: ${formatXu(player.wallet.xu)}.`);
+    throw new Error(`Bạn không đủ Xu để cược. Số dư hiện tại: ${formatXu(player.wallet.xu)}.`);
   }
 
   await adjustPlayerXu(userId, username, -betAmount, "xidach_bet", { xpGain: BET_XP_GAIN });
@@ -576,7 +576,7 @@ async function refundSession(session) {
     return null;
   }
   const updated = await adjustPlayerXu(session.hostUserId, session.hostUsername, session.betAmount, "xidach_refund");
-  return `ÄÃ£ hoÃ n ${formatXu(session.betAmount)} cho <@${session.hostUserId}>. Sá»‘ dÆ° hiá»‡n táº¡i: ${formatXu(updated.wallet.xu)}.`;
+  return `Đã hoàn ${formatXu(session.betAmount)} cho <@${session.hostUserId}>. Số dư hiện tại: ${formatXu(updated.wallet.xu)}.`;
 }
 
 async function settleSession(channel, session) {
@@ -598,7 +598,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Cáº£ hai Ä‘á»u Ä‘áº¡t ngÅ© linh nÃªn vÃ¡n nÃ y hÃ²a. Báº¡n Ä‘Æ°á»£c hoÃ n ${formatXu(session.betAmount)}. Sá»‘ dÆ°: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Cả hai đều đạt ngũ linh nên ván này hòa. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       pushes: 1,
       games: 1,
@@ -609,7 +609,7 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "HÃ²a ngÅ© linh",
+      resultLabel: "Hòa ngũ linh",
       betAmount: session.betAmount,
       netXu: 0,
       playerScore,
@@ -623,7 +623,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Báº¡n Ä‘áº¡t ngÅ© linh vÃ  tháº¯ng ${formatXu(payout)}. LÃ£i ${formatXu(session.betAmount)}. Sá»‘ dÆ°: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Bạn đạt ngũ linh và thắng ${formatXu(payout)}. Lãi ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       wins: 1,
       games: 1,
@@ -635,14 +635,14 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Tháº¯ng ngÅ© linh",
+      resultLabel: "Thắng ngũ linh",
       betAmount: session.betAmount,
       netXu: session.betAmount,
       playerScore,
       dealerScore
     });
   } else if (dealerNguLinh) {
-    resultText = `NhÃ  cÃ¡i Ä‘áº¡t ngÅ© linh. Báº¡n thua ${formatXu(session.betAmount)}.`;
+    resultText = `Nhà cái đạt ngũ linh. Bạn thua ${formatXu(session.betAmount)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       games: 1,
       profitXu: -session.betAmount
@@ -652,7 +652,7 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Thua nhÃ  cÃ¡i ngÅ© linh",
+      resultLabel: "Thua nhà cái ngũ linh",
       betAmount: session.betAmount,
       netXu: -session.betAmount,
       playerScore,
@@ -664,7 +664,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Cáº£ hai cÃ¹ng vÆ°á»£t 21 Ä‘iá»ƒm nÃªn vÃ¡n nÃ y hÃ²a. Báº¡n Ä‘Æ°á»£c hoÃ n ${formatXu(session.betAmount)}. Sá»‘ dÆ°: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Cả hai cùng vượt 21 điểm nên ván này hòa. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       pushes: 1,
       games: 1,
@@ -675,14 +675,14 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "HÃ²a cÃ¹ng quáº¯c",
+      resultLabel: "Hòa cùng quắc",
       betAmount: session.betAmount,
       netXu: 0,
       playerScore,
       dealerScore
     });
   } else if (playerScore > 21) {
-    resultText = `Báº¡n Ä‘Ã£ vÆ°á»£t quÃ¡ 21 Ä‘iá»ƒm. Báº¡n thua ${formatXu(session.betAmount)}.`;
+    resultText = `Bạn đã vượt quá 21 điểm. Bạn thua ${formatXu(session.betAmount)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       games: 1,
       profitXu: -session.betAmount
@@ -692,7 +692,7 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Thua quáº¯c",
+      resultLabel: "Thua quắc",
       betAmount: session.betAmount,
       netXu: -session.betAmount,
       playerScore,
@@ -706,7 +706,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Báº¡n tháº¯ng vÃ  nháº­n ${formatXu(payout)}. LÃ£i ${formatXu(session.betAmount)}. Sá»‘ dÆ°: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Bạn thắng và nhận ${formatXu(payout)}. Lãi ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       wins: 1,
       games: 1,
@@ -718,7 +718,7 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Tháº¯ng",
+      resultLabel: "Thắng",
       betAmount: session.betAmount,
       netXu: session.betAmount,
       playerScore,
@@ -730,7 +730,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Hai bÃªn hÃ²a Ä‘iá»ƒm. Báº¡n Ä‘Æ°á»£c hoÃ n ${formatXu(session.betAmount)}. Sá»‘ dÆ°: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Hai bên hòa điểm. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       pushes: 1,
       games: 1,
@@ -741,14 +741,14 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "HÃ²a",
+      resultLabel: "Hòa",
       betAmount: session.betAmount,
       netXu: 0,
       playerScore,
       dealerScore
     });
   } else {
-    resultText = `NhÃ  cÃ¡i cao Ä‘iá»ƒm hÆ¡n. Báº¡n thua ${formatXu(session.betAmount)}.`;
+    resultText = `Nhà cái cao điểm hơn. Bạn thua ${formatXu(session.betAmount)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       games: 1,
       profitXu: -session.betAmount
@@ -792,7 +792,7 @@ async function sendStartedRound(channel, nextSession, betAmount) {
   await sendOrRefreshStatusMessage(
     channel,
     nextSession,
-    `VÃ¡n má»›i Ä‘Ã£ báº¯t Ä‘áº§u vá»›i má»©c cÆ°á»£c ${formatXu(betAmount)}. Báº¥m **RÃºt** hoáº·c **Dá»«ng** Ä‘á»ƒ chÆ¡i.`
+    `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`
   );
 }
 
@@ -822,7 +822,7 @@ async function handleButtonInteraction(interaction) {
       });
 
       await sendStartedRound(interaction.channel, nextSession, betAmount);
-      await interaction.editReply(`ÄÃ£ má»Ÿ vÃ¡n XÃ¬ DÃ¡ch vá»›i má»©c cÆ°á»£c ${formatXu(betAmount)}.`);
+      await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
       return true;
     } catch (error) {
       if (interaction.deferred || interaction.replied) {
@@ -835,19 +835,19 @@ async function handleButtonInteraction(interaction) {
   }
 
   if (!session) {
-    await interaction.reply({ content: "VÃ¡n XÃ¬ DÃ¡ch nÃ y khÃ´ng cÃ²n hoáº¡t Ä‘á»™ng.", ephemeral: true });
+    await interaction.reply({ content: "Ván Xì Dách này không còn hoạt động.", ephemeral: true });
     return true;
   }
 
   if (interaction.user.id !== session.hostUserId) {
-    await interaction.reply({ content: "Chá»‰ ngÆ°á»i má»Ÿ vÃ¡n má»›i Ä‘Æ°á»£c báº¥m nÃºt trong vÃ¡n nÃ y.", ephemeral: true });
+    await interaction.reply({ content: "Chỉ người mở ván mới được bấm nút trong ván này.", ephemeral: true });
     return true;
   }
 
   if (parsed.action === "status") {
     await interaction.deferReply({ ephemeral: true });
-    await sendOrRefreshStatusMessage(interaction.channel, session, "ÄÃ¢y lÃ  tráº¡ng thÃ¡i hiá»‡n táº¡i cá»§a vÃ¡n.");
-    await interaction.editReply("ÄÃ£ cáº­p nháº­t láº¡i bÃ n XÃ¬ DÃ¡ch hiá»‡n táº¡i.");
+    await sendOrRefreshStatusMessage(interaction.channel, session, "Đây là trạng thái hiện tại của ván.");
+    await interaction.editReply("Đã cập nhật lại bàn Xì Dách hiện tại.");
     return true;
   }
 
@@ -881,7 +881,7 @@ async function handleButtonInteraction(interaction) {
   if (parsed.action === "stand") {
     await interaction.deferReply({ ephemeral: true });
     await settleSession(interaction.channel, session);
-    await interaction.editReply("ÄÃ£ dá»«ng rÃºt bÃ i vÃ  chá»‘t vÃ¡n. Káº¿t quáº£ Ä‘Ã£ gá»­i vÃ o phÃ²ng.");
+    await interaction.editReply("Đã dừng rút bài và chốt ván. Kết quả đã gửi vào phòng.");
     return true;
   }
 
@@ -907,7 +907,7 @@ async function handleModalInteraction(interaction) {
     });
 
     await sendStartedRound(interaction.channel, nextSession, betAmount);
-    await interaction.editReply(`ÄÃ£ má»Ÿ vÃ¡n XÃ¬ DÃ¡ch vá»›i má»©c cÆ°á»£c ${formatXu(betAmount)}.`);
+    await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
   } catch (error) {
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply({ content: error.message });
@@ -943,14 +943,14 @@ async function handleMessage(message) {
 
   if (STATUS_KEYWORDS.has(lowered)) {
     if (!session) {
-      return { ok: true, skipReaction: true, reply: "Hiá»‡n chÆ°a cÃ³ vÃ¡n XÃ¬ DÃ¡ch nÃ o Ä‘ang cháº¡y." };
+      return { ok: true, skipReaction: true, reply: "Hiện chưa có ván Xì Dách nào đang chạy." };
     }
-    return { ok: true, skipReaction: true, reply: "ÄÃ¢y lÃ  tráº¡ng thÃ¡i hiá»‡n táº¡i cá»§a vÃ¡n.", silent: false };
+    return { ok: true, skipReaction: true, reply: "Đây là trạng thái hiện tại của ván.", silent: false };
   }
 
   if (STOP_KEYWORDS.has(lowered)) {
     if (!session) {
-      return { ok: true, skipReaction: true, reply: "Hiá»‡n chÆ°a cÃ³ vÃ¡n XÃ¬ DÃ¡ch nÃ o Ä‘á»ƒ há»§y." };
+      return { ok: true, skipReaction: true, reply: "Hiện chưa có ván Xì Dách nào để hủy." };
     }
     const stoppedSession = stopSession(message.channel.id);
     const refundText = await refundSession(stoppedSession);
