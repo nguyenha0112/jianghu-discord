@@ -8,6 +8,7 @@ const {
   TextInputStyle
 } = require("discord.js");
 const { addPlayerXp } = require("../lib/player-progression");
+const { emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/baucua-room-store");
@@ -87,6 +88,13 @@ function buildBetLines(session) {
   });
 }
 
+function getTotalStake(session) {
+  return [...session.bets.values()].reduce(
+    (sum, userBets) => sum + userBets.bets.reduce((betSum, bet) => betSum + bet.amount, 0),
+    0
+  );
+}
+
 function buildComponents(session) {
   if (!session || session.phase !== "betting") {
     return [];
@@ -122,11 +130,14 @@ function buildStatusEmbed(session, note = "Chờ người chơi đặt cược."
   return new EmbedBuilder()
     .setColor(0x2ecc71)
     .setTitle("🎋 Bầu Cua Jianghu")
+    .setThumbnail(emojiToTwemojiUrl("🎋"))
     .setDescription(
       [
         `**Trạng thái:** ${session.phase === "betting" ? "Đang nhận cược" : "Đã chốt"}`,
         `**Thời gian còn lại:** ${session.phase === "betting" ? `${countDownSeconds(session)} giây` : "Đã lắc xong"}`,
-        `**Linh vật:** ${ANIMALS.map((animal) => `${animal.emoji} ${animal.label}`).join(" • ")}`
+        `**Linh vật:** ${ANIMALS.map((animal) => `${animal.emoji} ${animal.label}`).join(" • ")}`,
+        `**Người tham gia:** ${session.bets.size}`,
+        `**Tổng cược:** ${formatXu(getTotalStake(session))}`
       ].join("\n")
     )
     .addFields(
@@ -305,17 +316,22 @@ async function settleSession(channel, session) {
   const embed = new EmbedBuilder()
     .setColor(0x27ae60)
     .setTitle("🎋 KẾT QUẢ BẦU CUA")
+    .setThumbnail(emojiToTwemojiUrl(roll[0]?.emoji || "🎋"))
     .setDescription(
       [
         `${roll.map((animal) => animal.emoji).join(" ")}`,
         `Kết quả: ${roll.map((animal) => animal.label).join(" - ")}`
       ].join("\n")
     )
-    .addFields({
-      name: "Danh sách tham gia",
-      value: summaryLines.join("\n") || "Không có ai tham gia cược ván này.",
-      inline: false
-    });
+    .addFields(
+      { name: "👥 Người tham gia", value: String(session.bets.size), inline: true },
+      { name: "🪙 Tổng cược", value: formatXu(getTotalStake(session)), inline: true },
+      {
+        name: "Danh sách tham gia",
+        value: summaryLines.join("\n") || "Không có ai tham gia cược ván này.",
+        inline: false
+      }
+    );
 
   await channel.send({ embeds: [embed] }).catch(() => {});
   return { ok: true };

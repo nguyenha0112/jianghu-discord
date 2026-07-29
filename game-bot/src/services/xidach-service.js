@@ -1,5 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
 const { addPlayerXp } = require("../lib/player-progression");
+const { emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
@@ -125,6 +126,7 @@ function buildStatusEmbed(session, note = "Đến lượt người chơi quyết
   return new EmbedBuilder()
     .setColor(0x9b59b6)
     .setTitle("🃏 Xì Dách Jianghu")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(
       [
         `**Người chơi:** <@${session.hostUserId}>`,
@@ -145,11 +147,14 @@ function buildSettlementEmbed(session, resultText) {
   return new EmbedBuilder()
     .setColor(0x8e44ad)
     .setTitle("🃏 Kết Quả Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
     .setDescription(
       [
         resultText,
+        "",
         `**Bạn - ${playerScore}**`,
         formatCards(session.playerCards),
+        "",
         `**Nhà cái - ${dealerScore}**`,
         formatCards(session.dealerCards)
       ].join("\n")
@@ -388,7 +393,10 @@ async function handleMessage(message) {
         betAmount
       });
 
-      await message.channel.send({ embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}.`)], components: buildActionComponents(nextSession) });
+      await message.channel.send({
+        embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`)],
+        components: buildActionComponents(nextSession)
+      });
       return { ok: true, skipReaction: true, silent: true };
     } catch (error) {
       return { ok: false, skipReaction: true, reply: error.message };
