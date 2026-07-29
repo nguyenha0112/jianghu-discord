@@ -2,28 +2,34 @@ const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { exploreSecretRealm, getSecretRealmListings } = require("../services/game-service");
 const { emojiToTwemojiUrl, formatItemLabel } = require("../lib/ui-theme");
 
+const secretRealmChoices = getSecretRealmListings().map((entry) => ({
+  name: entry.name,
+  value: entry.realmId
+}));
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("bicanh")
-    .setDescription("Thám hiểm bí cảnh, đánh quái hoặc khiêu chiến boss.")
+    .setDescription("Tham hiem bi canh, danh quai hoac khieu chien boss.")
     .addStringOption((option) =>
       option
-        .setName("realm_id")
-        .setDescription("ID bí cảnh muốn thám hiểm")
+        .setName("bi_canh")
+        .setDescription("Chon bi canh muon tham hiem")
         .setRequired(false)
+        .addChoices(...secretRealmChoices)
     )
     .addStringOption((option) =>
       option
         .setName("che_do")
-        .setDescription("Chọn đánh quái thường hoặc boss")
+        .setDescription("Chon danh quai thuong hoac boss")
         .setRequired(false)
         .addChoices(
-          { name: "Quái thường", value: "thuong" },
+          { name: "Quai thuong", value: "thuong" },
           { name: "Boss", value: "boss" }
         )
     ),
   async execute(interaction) {
-    const realmId = interaction.options.getString("realm_id");
+    const realmId = interaction.options.getString("bi_canh");
     const mode = interaction.options.getString("che_do") || "thuong";
 
     if (realmId) {
@@ -64,11 +70,11 @@ module.exports = {
             listings
               .map(
                 (entry) =>
-                  `\`${entry.realmId}\`\n**${entry.name}**\nQuái canh giữ: ${entry.monster.emoji} **${entry.monster.name}**\nBoss: ${entry.boss.emoji} **${entry.boss.name}**\nYêu cầu: cảnh giới bậc **${entry.minRealmIndex + 1}** trở lên\nHồi lại: **${entry.cooldownHours} giờ**`
+                  `**${entry.name}**\nQuái canh giữ: ${entry.monster.emoji} **${entry.monster.name}**\nBoss: ${entry.boss.emoji} **${entry.boss.name}**\nYêu cầu: cảnh giới bậc **${entry.minRealmIndex + 1}** trở lên\nHồi lại: **${entry.cooldownHours} giờ**`
               )
               .join("\n\n")
           )
-          .setFooter({ text: "Dùng /bicanh realm_id:<id> che_do:boss để đánh boss hoặc che_do:thuong để farm quái." })
+          .setFooter({ text: "Dùng /bicanh rồi chọn bí cảnh và chế độ để farm quái hoặc đánh boss." })
       ]
     });
   }

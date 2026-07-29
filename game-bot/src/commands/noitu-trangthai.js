@@ -4,7 +4,7 @@ const { buildStatusEmbed, getRoomConfig, getSessionStatus } = require("../servic
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("noitu-trangthai")
-    .setDescription("Xem trạng thái ván nối từ hiện tại."),
+    .setDescription("Xem trang thai van noi tu hien tai."),
   async execute(interaction) {
     const roomConfig = getRoomConfig(interaction.channelId);
     if (!roomConfig) {
@@ -14,7 +14,7 @@ module.exports = {
 
     const session = getSessionStatus(interaction.channelId);
     if (!session) {
-      await interaction.reply("Phòng này đã bật nối từ nhưng hiện chưa có ván nào đang chạy.");
+      await interaction.reply("Phòng này đã bật nối từ nhưng hiện chưa có ván nào đang chạy. Nhắn `!play` để mở ván nhanh hoặc dùng `/noitu-tao` nếu muốn tự chọn cụm mở đầu.");
       return;
     }
 
