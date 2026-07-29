@@ -12,6 +12,7 @@ const { getVietnameseKingRanking, updateVietnameseKingRanking } = require("../st
 const DATA_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-puzzles.json");
 const CUSTOM_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
 const BONUS_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-phrases.txt");
+const BONUS_PUZZLES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-puzzles.json");
 const sessions = new Map();
 const recentPuzzleIdsByGuild = new Map();
 
@@ -26,8 +27,8 @@ const POINT_REWARD_XU = 8;
 const WIN_BONUS_XU = 20;
 const POINT_REWARD_XP = 5;
 const WIN_BONUS_XP = 15;
-const MAX_RECENT_PUZZLES = 30;
-const MAX_GLOBAL_RECENT_PUZZLES = 120;
+const MAX_RECENT_PUZZLES = 120;
+const MAX_GLOBAL_RECENT_PUZZLES = 360;
 const HINT_POINT_PENALTY = 1;
 
 function inferDifficultyFromAnswer(answer) {
@@ -122,12 +123,24 @@ function dedupePuzzles(items) {
   });
 }
 
-function loadPuzzleBank() {
-  if (!fs.existsSync(DATA_PATH)) {
+function loadCuratedPuzzles(filePath) {
+  if (!fs.existsSync(filePath)) {
     return [];
   }
-  const raw = JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
-  const curated = Array.isArray(raw.puzzles) ? raw.puzzles : [];
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return Array.isArray(raw.puzzles) ? raw.puzzles : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadPuzzleBank() {
+  const curated = [
+    ...loadCuratedPuzzles(DATA_PATH),
+    ...loadCuratedPuzzles(BONUS_PUZZLES_PATH)
+  ];
   const generated = [
     ...loadGeneratedPhrasePuzzles(CUSTOM_PHRASES_PATH, "custom"),
     ...loadGeneratedPhrasePuzzles(BONUS_PHRASES_PATH, "bonus")
@@ -287,10 +300,10 @@ function getPuzzlePriorityScore(puzzle) {
 
 function getTargetDifficulty(session) {
   const moveCount = session.moveCount || 0;
-  if (moveCount >= 2 && moveCount % 3 === 0) {
+  if (moveCount >= 4 && moveCount % 4 === 0) {
     return "hard";
   }
-  if (moveCount >= 1) {
+  if (moveCount >= 2) {
     return "medium";
   }
   return "easy";
@@ -307,14 +320,14 @@ function pickPuzzle(session) {
 
   const targetDifficulty = getTargetDifficulty(session);
   const difficultyPool = pool.filter((item) => item.difficulty === targetDifficulty);
-  const effectivePool = difficultyPool.length >= 8 ? difficultyPool : pool;
+  const effectivePool = difficultyPool.length >= 20 ? difficultyPool : pool;
   const scored = effectivePool
     .map((item) => ({ item, score: getPuzzlePriorityScore(item) }))
     .sort((left, right) => right.score - left.score);
 
   const topScore = scored[0]?.score ?? 0;
   const candidatePool = scored
-    .filter((entry) => entry.score >= topScore - 25)
+    .filter((entry) => entry.score >= topScore - 60)
     .map((entry) => entry.item);
 
   return candidatePool[Math.floor(Math.random() * candidatePool.length)];
@@ -330,8 +343,8 @@ function setNextPuzzle(session) {
   session.patternText = getPuzzlePattern(puzzle.answer);
   session.hintLevel = puzzle.type === "word" ? 0 : 1;
   session.usedPuzzleIds.push(puzzle.id);
-  if (session.usedPuzzleIds.length > 50) {
-    session.usedPuzzleIds = session.usedPuzzleIds.slice(-50);
+  if (session.usedPuzzleIds.length > 200) {
+    session.usedPuzzleIds = session.usedPuzzleIds.slice(-200);
   }
   rememberGuildPuzzle(session.guildId, puzzle.id);
   return puzzle;
