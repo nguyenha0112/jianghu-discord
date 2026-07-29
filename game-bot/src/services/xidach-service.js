@@ -4,6 +4,12 @@ const { emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
+const {
+  updateXiDachRanking,
+  getXiDachRanking,
+  addXiDachHistoryEntry,
+  getXiDachHistory
+} = require("../storage/xidach-ranking-store");
 
 const sessions = new Map();
 
@@ -11,6 +17,8 @@ const START_RE = /^!(play|batdau|xidach)\s+(\d+)$/u;
 const STOP_KEYWORDS = new Set(["!stop", "!out"]);
 const HELP_KEYWORDS = new Set(["!help", "!huongdan"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
+const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
+const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
 
 const MIN_BET = 20;
 const MAX_BET = 250000;
@@ -166,7 +174,38 @@ function getHelpText() {
     "Luật: nhắn `!play 1000` để bắt đầu một ván Xì Dách với mức cược 1000 Xu.",
     "Sau đó bấm `Rút` để lấy thêm bài hoặc `Dừng` để so điểm với nhà cái.",
     "A có thể tính là 1 hoặc 11. Quá 21 là quắc ngay.",
-    "Nhắn `!stop` hoặc `!out` để thoát ván đang treo."
+    "Nhắn `!stop` hoặc `!out` để thoát ván đang treo.",
+    "Nhắn `!bxh` để xem bảng xếp hạng, `!lichsu` để xem các ván gần đây."
+  ].join("\n");
+}
+
+function getRankingText() {
+  const ranking = getXiDachRanking(10);
+  if (ranking.length === 0) {
+    return "Xì Dách chưa có dữ liệu xếp hạng.";
+  }
+
+  return [
+    "**🏆 Bảng xếp hạng Xì Dách**",
+    ...ranking.map(
+      (entry, index) =>
+        `${index + 1}. <@${entry.userId}> - Thắng: ${entry.wins}, Hòa: ${entry.pushes}, Lãi: ${formatXu(entry.profitXu)}, Ván: ${entry.games}, Ăn đậm nhất: ${formatXu(entry.bestWinXu)}`
+    )
+  ].join("\n");
+}
+
+function getHistoryText() {
+  const history = getXiDachHistory(8);
+  if (history.length === 0) {
+    return "Xì Dách chưa có lịch sử ván nào.";
+  }
+
+  return [
+    "**🧾 Lịch sử Xì Dách gần đây**",
+    ...history.map(
+      (entry, index) =>
+        `${index + 1}. <@${entry.userId}> | Kết quả: ${entry.resultLabel} | Cược: ${formatXu(entry.betAmount)} | Lãi: ${formatXu(entry.netXu)} | Điểm: ${entry.playerScore}-${entry.dealerScore}`
+    )
   ].join("\n");
 }
 
@@ -272,6 +311,21 @@ async function settleSession(channel, session) {
 
   if (playerScore > 21) {
     resultText = `Bạn đã vượt quá 21 điểm. Bạn thua ${formatXu(session.betAmount)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, {
+      games: 1,
+      profitXu: -session.betAmount
+    });
+    addXiDachHistoryEntry({
+      guildId: session.guildId,
+      channelId: session.channelId,
+      userId: session.hostUserId,
+      username: session.hostUsername,
+      resultLabel: "Thua quắc",
+      betAmount: session.betAmount,
+      netXu: -session.betAmount,
+      playerScore,
+      dealerScore
+    });
   } else if (dealerScore > 21 || playerScore > dealerScore) {
     payout = session.betAmount * 2;
     xpGain = WIN_XP_GAIN;
@@ -281,6 +335,23 @@ async function settleSession(channel, session) {
       playerScore
     });
     resultText = `Bạn thắng và nhận ${formatXu(payout)}. Lãi ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, {
+      wins: 1,
+      games: 1,
+      profitXu: session.betAmount,
+      bestWinXu: session.betAmount
+    });
+    addXiDachHistoryEntry({
+      guildId: session.guildId,
+      channelId: session.channelId,
+      userId: session.hostUserId,
+      username: session.hostUsername,
+      resultLabel: "Thắng",
+      betAmount: session.betAmount,
+      netXu: session.betAmount,
+      playerScore,
+      dealerScore
+    });
   } else if (playerScore === dealerScore) {
     payout = session.betAmount;
     const updated = await adjustPlayerXu(session.hostUserId, session.hostUsername, payout, "xidach_push", {
@@ -288,8 +359,39 @@ async function settleSession(channel, session) {
       playerScore
     });
     resultText = `Hai bên hòa điểm. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, {
+      pushes: 1,
+      games: 1,
+      profitXu: 0
+    });
+    addXiDachHistoryEntry({
+      guildId: session.guildId,
+      channelId: session.channelId,
+      userId: session.hostUserId,
+      username: session.hostUsername,
+      resultLabel: "Hòa",
+      betAmount: session.betAmount,
+      netXu: 0,
+      playerScore,
+      dealerScore
+    });
   } else {
     resultText = `Nhà cái cao điểm hơn. Bạn thua ${formatXu(session.betAmount)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, {
+      games: 1,
+      profitXu: -session.betAmount
+    });
+    addXiDachHistoryEntry({
+      guildId: session.guildId,
+      channelId: session.channelId,
+      userId: session.hostUserId,
+      username: session.hostUsername,
+      resultLabel: "Thua",
+      betAmount: session.betAmount,
+      netXu: -session.betAmount,
+      playerScore,
+      dealerScore
+    });
   }
 
   sessions.delete(session.channelId);
@@ -362,6 +464,12 @@ async function handleMessage(message) {
 
   if (HELP_KEYWORDS.has(lowered)) {
     return { ok: true, skipReaction: true, reply: getHelpText() };
+  }
+  if (RANKING_KEYWORDS.has(lowered)) {
+    return { ok: true, skipReaction: true, reply: getRankingText() };
+  }
+  if (HISTORY_KEYWORDS.has(lowered)) {
+    return { ok: true, skipReaction: true, reply: getHistoryText() };
   }
 
   if (STATUS_KEYWORDS.has(lowered)) {

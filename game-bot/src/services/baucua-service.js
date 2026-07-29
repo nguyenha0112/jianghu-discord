@@ -12,6 +12,12 @@ const { emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/baucua-room-store");
+const {
+  updateBauCuaRanking,
+  getBauCuaRanking,
+  addBauCuaHistoryEntry,
+  getBauCuaHistory
+} = require("../storage/baucua-ranking-store");
 
 const sessions = new Map();
 
@@ -20,6 +26,8 @@ const STOP_KEYWORDS = new Set(["!stop"]);
 const HELP_KEYWORDS = new Set(["!help", "!huongdan"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 const CLOSE_KEYWORDS = new Set(["!chot", "!lac"]);
+const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
+const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
 
 const BETTING_DURATION_MS = 30000;
 const MIN_BET = 20;
@@ -188,7 +196,41 @@ function getHelpText() {
     `Cược tối thiểu ${MIN_BET} Xu, tối đa ${MAX_BET} Xu mỗi lần.`,
     "Khi mở kèo, bot sẽ lắc ra 3 linh vật.",
     "Mỗi lần linh vật bạn cược xuất hiện, bạn nhận lại đúng số Xu đã cược cho lần xuất hiện đó.",
-    "Có thể bấm nút hoặc dùng !chot để lắc sớm."
+    "Có thể bấm nút hoặc dùng !chot để lắc sớm.",
+    "Nhắn `!bxh` để xem bảng xếp hạng, `!lichsu` để xem các ván gần đây."
+  ].join("\n");
+}
+
+function getRankingText() {
+  const ranking = getBauCuaRanking(10);
+  if (ranking.length === 0) {
+    return "Bầu Cua chưa có dữ liệu xếp hạng.";
+  }
+
+  return [
+    "**🏆 Bảng xếp hạng Bầu Cua**",
+    ...ranking.map(
+      (entry, index) =>
+        `${index + 1}. <@${entry.userId}> - Thắng: ${entry.wins}, Lãi: ${formatXu(entry.profitXu)}, Ván: ${entry.games}, Ăn đậm nhất: ${formatXu(entry.bestWinXu)}`
+    )
+  ].join("\n");
+}
+
+function getHistoryText() {
+  const history = getBauCuaHistory(8);
+  if (history.length === 0) {
+    return "Bầu Cua chưa có lịch sử ván nào.";
+  }
+
+  return [
+    "**🧾 Lịch sử Bầu Cua gần đây**",
+    ...history.map((entry, index) => {
+      const summary =
+        entry.winners.length > 0
+          ? entry.winners.map((winner) => `<@${winner.userId}> (+${formatXu(winner.netXu)})`).join(", ")
+          : "Không ai lãi";
+      return `${index + 1}. ${entry.rollLabels.join(" - ")} | Tổng cược: ${formatXu(entry.totalStake)} | Kết quả: ${summary}`;
+    })
   ].join("\n");
 }
 
@@ -279,6 +321,7 @@ async function settleSession(channel, session) {
   session.lastRoll = roll;
 
   const summaryLines = [];
+  const winners = [];
   for (const [userId, userBets] of session.bets.entries()) {
     const totalStake = userBets.bets.reduce((sum, bet) => sum + bet.amount, 0);
     let totalPayout = 0;
@@ -301,6 +344,21 @@ async function settleSession(channel, session) {
     }
 
     const net = totalPayout - totalStake;
+    updateBauCuaRanking(userId, userBets.username, {
+      wins: net > 0 ? 1 : 0,
+      games: 1,
+      profitXu: net,
+      bestWinXu: net > 0 ? net : 0
+    });
+
+    if (net > 0) {
+      winners.push({
+        userId,
+        username: userBets.username,
+        netXu: net
+      });
+    }
+
     const betLabels = userBets.bets.map((bet) => {
       const animal = getAnimalByKey(bet.kind);
       return `${animal?.emoji || "🎲"} ${animal?.label || bet.kind} ${formatNumber(bet.amount)}`;
@@ -312,6 +370,15 @@ async function settleSession(channel, session) {
       }${updatedPlayer ? `. Số dư: ${formatXu(updatedPlayer.wallet.xu)}` : ""}.`
     );
   }
+
+  addBauCuaHistoryEntry({
+    guildId: session.guildId,
+    channelId: session.channelId,
+    rollKeys: roll.map((animal) => animal.key),
+    rollLabels: roll.map((animal) => animal.label),
+    totalStake: getTotalStake(session),
+    winners
+  });
 
   const embed = new EmbedBuilder()
     .setColor(0x27ae60)
@@ -495,6 +562,12 @@ async function handleMessage(message) {
     if (HELP_KEYWORDS.has(lowered)) {
       return { ok: true, skipReaction: true, reply: getHelpText() };
     }
+    if (RANKING_KEYWORDS.has(lowered)) {
+      return { ok: true, skipReaction: true, reply: getRankingText() };
+    }
+    if (HISTORY_KEYWORDS.has(lowered)) {
+      return { ok: true, skipReaction: true, reply: getHistoryText() };
+    }
     if (STATUS_KEYWORDS.has(lowered)) {
       return { ok: true, skipReaction: true, reply: "Hiện chưa có kèo Bầu Cua nào đang mở." };
     }
@@ -524,6 +597,12 @@ async function handleMessage(message) {
 
   if (HELP_KEYWORDS.has(lowered)) {
     return { ok: true, skipReaction: true, reply: getHelpText() };
+  }
+  if (RANKING_KEYWORDS.has(lowered)) {
+    return { ok: true, skipReaction: true, reply: getRankingText() };
+  }
+  if (HISTORY_KEYWORDS.has(lowered)) {
+    return { ok: true, skipReaction: true, reply: getHistoryText() };
   }
   if (STATUS_KEYWORDS.has(lowered)) {
     await sendOrRefreshStatusMessage(message.channel, session, "Đây là trạng thái hiện tại của kèo Bầu Cua.");
