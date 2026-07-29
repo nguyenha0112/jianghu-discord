@@ -10,20 +10,20 @@ module.exports = {
     const summary = await getWalletSummary(interaction.user.id, interaction.user.username);
 
     const embed = new EmbedBuilder()
-      .setColor(0xf1c40f)
+      .setColor(0xf5b041)
       .setTitle(`🪙 ${interaction.user.username} • Linh Khố`)
       .setThumbnail(emojiToTwemojiUrl("🪙"))
       .setDescription(
         [
-          `**Xu:** 🪙 **${summary.wallet.xu}**`,
-          `**Ngọc:** 💎 **${summary.wallet.ngoc}**`,
-          `**Tiến độ cấp nhân vật:** \`${buildProgressBar(summary.stats.playerXp, 100)}\` ${summary.stats.playerXp}/100 XP`
+          `**Xu hiện có:** 🪙 **${summary.wallet.xu}**`,
+          `**Ngọc hiện có:** 💎 **${summary.wallet.ngoc}**`,
+          `**Tiến độ tu vi:** \`${buildProgressBar(summary.stats.playerXp, 100)}\` ${summary.stats.playerXp}/100 XP`
         ].join("\n")
       )
       .addFields(
-        { name: "🧍 Nhân vật", value: `Level: **${summary.stats.playerLevel}**\nXP: **${summary.stats.playerXp}**`, inline: true },
-        { name: "📈 Tích lũy", value: `Tổng Xu: **${summary.stats.totalXuEarned}**\nTổng Ngọc: **${summary.stats.totalNgocEarned}**`, inline: true },
-        { name: "🛠️ Hoạt động", value: `Đi làm: **${summary.stats.totalWorkActions}**\nĐã bán: **${summary.stats.totalItemsSold}**`, inline: true }
+        { name: "🌸 Nhân vật", value: `Cấp **${summary.stats.playerLevel}**\nXP hiện tại **${summary.stats.playerXp}**`, inline: true },
+        { name: "📈 Tích lũy", value: `Tổng Xu **${summary.stats.totalXuEarned}**\nTổng Ngọc **${summary.stats.totalNgocEarned}**`, inline: true },
+        { name: "🧺 Hoạt động", value: `Đi làm **${summary.stats.totalWorkActions}** lần\nĐã bán **${summary.stats.totalItemsSold}** vật phẩm`, inline: true }
       )
       .setFooter({
         text: `${summary.currencies.xu.description} | ${summary.currencies.ngoc.description}`
