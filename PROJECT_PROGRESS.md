@@ -100,6 +100,17 @@ Cap nhat lan cuoi: 2026-07-29
 - [ ] Daily / weekly quest system
 - [ ] Admin controls / moderation tools cho minigame
 
+## Priority Order
+
+1. Economy balancing v1
+2. Reward scaling full pass cho Noi Tu / VTTV / Tai Xiu
+3. Tool progression + recipe balance
+4. Noi Tu strict config / allowlist
+5. Vua Tieng Viet mo rong data curated medium / hard
+6. Daily / weekly quest system
+7. Admin controls / moderation tools cho minigame
+8. Supabase schema fix cho cultivation columns de bo fallback JSON
+
 ## Later Priority
 
 - [ ] Seed data V1
