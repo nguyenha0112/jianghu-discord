@@ -1,4 +1,5 @@
 const { spawn } = require("node:child_process");
+const http = require("node:http");
 const path = require("node:path");
 
 function requiredEnv(name) {
@@ -38,6 +39,21 @@ function startProcess(label, cwd, script, env) {
 }
 
 const rootDir = path.resolve(__dirname, "..");
+const port = Number(process.env.PORT || 10000);
+const healthServer = http.createServer((request, response) => {
+  const payload = {
+    ok: true,
+    service: "jianghu-discord-game",
+    bots: ["chat-bot", "game-bot"]
+  };
+
+  response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(payload));
+});
+
+healthServer.listen(port, "0.0.0.0", () => {
+  console.log(`[health] listening on port ${port}`);
+});
 
 const chatEnv = {
   DISCORD_TOKEN: requiredEnv("DISCORD_TOKEN_1"),
