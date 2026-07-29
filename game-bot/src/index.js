@@ -16,27 +16,33 @@ const runtimeDir = path.join(__dirname, "..", "data", "runtime");
 const lockFile = path.join(runtimeDir, "bot.lock");
 
 if (!token) {
-  console.error("Thiếu DISCORD_TOKEN trong game-bot/.env");
+  console.error("Thieu DISCORD_TOKEN trong game-bot/.env");
   process.exit(1);
 }
 
 function ensureSingleInstance() {
   fs.mkdirSync(runtimeDir, { recursive: true });
 
-  if (fs.existsSync(lockFile)) {
-    try {
-      const existingPid = Number(fs.readFileSync(lockFile, "utf8").trim());
-      if (existingPid && existingPid !== process.pid) {
-        process.kill(existingPid, 0);
-        console.error(`Bot đang chạy ở tiến trình khác (${existingPid}). Bỏ qua lần khởi động này.`);
-        process.exit(1);
-      }
-    } catch (error) {
-      // Lock cũ không còn hợp lệ, sẽ ghi đè ở dưới.
+  try {
+    fs.writeFileSync(lockFile, String(process.pid), { flag: "wx" });
+    return;
+  } catch (error) {
+    if (error.code !== "EEXIST") {
+      throw error;
     }
   }
 
-  fs.writeFileSync(lockFile, String(process.pid));
+  try {
+    const existingPid = Number(fs.readFileSync(lockFile, "utf8").trim());
+    if (existingPid && existingPid !== process.pid) {
+      process.kill(existingPid, 0);
+      console.error(`Bot dang chay o tien trinh khac (${existingPid}). Bo qua lan khoi dong nay.`);
+      process.exit(1);
+    }
+  } catch (error) {
+    fs.rmSync(lockFile, { force: true });
+    fs.writeFileSync(lockFile, String(process.pid), { flag: "wx" });
+  }
 }
 
 function cleanupLockFile() {
@@ -50,7 +56,7 @@ function cleanupLockFile() {
       fs.rmSync(lockFile, { force: true });
     }
   } catch (error) {
-    // Bỏ qua lỗi dọn lock khi thoát.
+    // Bo qua loi don lock khi thoat.
   }
 }
 
@@ -81,12 +87,12 @@ for (const file of commandFiles) {
   if (command.data && command.execute) {
     client.commands.set(command.data.name, command);
   } else {
-    console.warn(`Bỏ qua command không hợp lệ: ${file}`);
+    console.warn(`Bo qua command khong hop le: ${file}`);
   }
 }
 
 client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
+  console.log(`Jianghu Game Bot da dang nhap voi ten ${readyClient.user.tag}`);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -132,7 +138,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (error) {
     console.error(`Command failed: ${interaction.commandName}`, error);
     const payload = {
-      content: "Lệnh gặp lỗi. Kiểm tra console để debug.",
+      content: "Lenh gap loi. Kiem tra console de debug.",
       ephemeral: true
     };
 

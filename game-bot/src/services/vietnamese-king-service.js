@@ -11,6 +11,7 @@ const { getVietnameseKingRanking, updateVietnameseKingRanking } = require("../st
 
 const DATA_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-puzzles.json");
 const CUSTOM_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
+const BONUS_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-phrases.txt");
 const sessions = new Map();
 const recentPuzzleIdsByGuild = new Map();
 
@@ -128,7 +129,8 @@ function loadPuzzleBank() {
   const raw = JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
   const curated = Array.isArray(raw.puzzles) ? raw.puzzles : [];
   const generated = [
-    ...loadGeneratedPhrasePuzzles(CUSTOM_PHRASES_PATH, "custom")
+    ...loadGeneratedPhrasePuzzles(CUSTOM_PHRASES_PATH, "custom"),
+    ...loadGeneratedPhrasePuzzles(BONUS_PHRASES_PATH, "bonus")
   ];
   return dedupePuzzles([...curated, ...generated]);
 }

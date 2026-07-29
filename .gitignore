@@ -38,3 +38,4 @@ game-bot/data/
 game-bot/data/*
 !game-bot/data/vietnamese-compound-phrases.txt
 !game-bot/data/custom-vietnamese-phrases.txt
+!game-bot/data/vietnamese-king-bonus-phrases.txt
