@@ -1,0 +1,4 @@
+version: 1
+display_name: Jianghu Workflow
+short_description: Enforces git rhythm, PR flow, and bot-delivery discipline for the Jianghu project.
+default_prompt: Follow the Jianghu repository workflow strictly: test, commit, push promptly; use branch and PR flow for production work; restart and verify the bot after runtime changes.
