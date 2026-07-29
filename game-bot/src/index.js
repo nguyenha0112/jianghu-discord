@@ -3,6 +3,11 @@ require("dotenv").config();
 const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
+const { hydrateRooms: hydrateWordChainRooms } = require("./storage/word-chain-room-store");
+const { hydrateRooms: hydrateTaiXiuRooms } = require("./storage/taixiu-room-store");
+const { hydrateRooms: hydrateBauCuaRooms } = require("./storage/baucua-room-store");
+const { hydrateRooms: hydrateVietnameseKingRooms } = require("./storage/vietnamese-king-room-store");
+const { hydrateRooms: hydrateXiDachRooms } = require("./storage/xidach-room-store");
 const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
 const {
   handleMessage: handleTaiXiuMessage,
@@ -232,4 +237,20 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
-client.login(token);
+async function bootstrap() {
+  await Promise.all([
+    hydrateWordChainRooms(),
+    hydrateTaiXiuRooms(),
+    hydrateBauCuaRooms(),
+    hydrateVietnameseKingRooms(),
+    hydrateXiDachRooms()
+  ]);
+
+  await client.login(token);
+}
+
+bootstrap().catch((error) => {
+  console.error("Khoi dong Jianghu Game Bot that bai:", error);
+  cleanupLockFile();
+  process.exit(1);
+});

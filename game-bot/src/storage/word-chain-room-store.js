@@ -1,60 +1,9 @@
-const fs = require("node:fs");
-const path = require("node:path");
+const { createRoomStore } = require("./create-room-store");
 
-const dataDir = path.join(__dirname, "..", "..", "data");
-const dataFile = path.join(dataDir, "word-chain-rooms.json");
-
-function ensureStore() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+module.exports = createRoomStore({
+  gameKey: "word_chain",
+  fileName: "word-chain-rooms.json",
+  defaults: {
+    mode: "pvp"
   }
-
-  if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, JSON.stringify({ rooms: {} }, null, 2));
-  }
-}
-
-function readStore() {
-  ensureStore();
-  return JSON.parse(fs.readFileSync(dataFile, "utf8"));
-}
-
-function writeStore(store) {
-  ensureStore();
-  fs.writeFileSync(dataFile, JSON.stringify(store, null, 2));
-}
-
-function enableRoom(channelId, config) {
-  const store = readStore();
-  store.rooms[channelId] = {
-    enabled: true,
-    mode: config.mode || "pvp",
-    ...config,
-    updatedAt: new Date().toISOString()
-  };
-  writeStore(store);
-  return store.rooms[channelId];
-}
-
-function disableRoom(channelId) {
-  const store = readStore();
-  delete store.rooms[channelId];
-  writeStore(store);
-}
-
-function getRoom(channelId) {
-  const store = readStore();
-  return store.rooms[channelId] || null;
-}
-
-function isEnabledRoom(channelId) {
-  const room = getRoom(channelId);
-  return Boolean(room?.enabled);
-}
-
-module.exports = {
-  enableRoom,
-  disableRoom,
-  getRoom,
-  isEnabledRoom
-};
+});
