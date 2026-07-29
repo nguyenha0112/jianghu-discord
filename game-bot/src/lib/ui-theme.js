@@ -82,6 +82,24 @@ function getPrimaryVisual(professionId, realmKey) {
   };
 }
 
+function formatLevelUpText(levelInfo) {
+  if (!levelInfo?.didLevelUp) {
+    return null;
+  }
+  return `🎉 Lên cấp tu vi từ **${levelInfo.levelBefore}** lên **${levelInfo.levelAfter}**.`;
+}
+
+function buildCuteLevelField(levelInfo) {
+  if (!levelInfo?.didLevelUp) {
+    return null;
+  }
+  return {
+    name: "🌸 Thăng cấp",
+    value: `Từ cấp **${levelInfo.levelBefore}** lên **${levelInfo.levelAfter}**\n✨ Linh lực lại dồi dào hơn rồi.`,
+    inline: false
+  };
+}
+
 module.exports = {
   emojiToTwemojiUrl,
   getProfessionTheme,
@@ -90,5 +108,7 @@ module.exports = {
   getItemTheme,
   buildProgressBar,
   formatItemLabel,
-  getPrimaryVisual
+  getPrimaryVisual,
+  formatLevelUpText,
+  buildCuteLevelField
 };

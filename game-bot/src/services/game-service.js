@@ -11,7 +11,7 @@ const artifacts = require("../config/artifacts");
 const secretRealms = require("../config/secret-realms");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
-const { addPlayerXp } = require("../lib/player-progression");
+const { addPlayerXp, applyPlayerXp } = require("../lib/player-progression");
 
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const WORK_COOLDOWN_MS = 60 * 60 * 1000;
@@ -235,7 +235,7 @@ async function claimDaily(userId, username) {
   const dwelling = getCurrentDwelling(player);
   const xuGain = 100 + cultivation.dwellingLevel * 10;
   const ngocGain = 3;
-  const nextStats = addPlayerXp(
+  const playerXpResult = applyPlayerXp(
     {
       ...player.stats,
       totalXuEarned: player.stats.totalXuEarned + xuGain,
@@ -247,7 +247,7 @@ async function claimDaily(userId, username) {
   const updated = await updatePlayer(userId, {
     username,
     wallet: { xu: player.wallet.xu + xuGain, ngoc: player.wallet.ngoc + ngocGain },
-    stats: nextStats,
+    stats: playerXpResult.stats,
     cultivation,
     cooldowns: { ...player.cooldowns, dailyAt: getNow() }
   });
@@ -256,6 +256,7 @@ async function claimDaily(userId, username) {
   return {
     ok: true,
     player: updated,
+    levelInfo: playerXpResult.levelInfo,
     message: `Bạn nhận được ${xuGain} Xu và ${ngocGain} Ngọc từ daily. Động phủ ${dwelling.name} giúp linh khí dồi dào hơn. +20 Player XP.`
   };
 }
@@ -283,7 +284,7 @@ async function doWork(userId, username) {
   const realmCap = getRealmCap(player);
   const nextLevel = Math.min(uncappedLevel, realmCap);
   const carriedXp = nextXp % 100;
-  const nextStats = addPlayerXp(
+  const playerXpResult = applyPlayerXp(
     { ...player.stats, totalXuEarned: player.stats.totalXuEarned + xuGain, totalWorkActions: player.stats.totalWorkActions + 1 },
     10
   );
@@ -291,7 +292,7 @@ async function doWork(userId, username) {
   const updated = await updatePlayer(userId, {
     username,
     wallet: { ...player.wallet, xu: player.wallet.xu + xuGain },
-    stats: nextStats,
+    stats: playerXpResult.stats,
     inventory: addItem(player.inventory, drop.itemId, drop.quantity),
     profession: {
       current: professionId,
@@ -308,6 +309,7 @@ async function doWork(userId, username) {
     ok: true,
     player: updated,
     profession: professionConfig,
+    levelInfo: playerXpResult.levelInfo,
     reward: {
       xuGain,
       itemId: drop.itemId,
@@ -624,12 +626,12 @@ async function exploreSecretRealm(userId, username, realmId, mode = "thuong") {
     weight: entry.weight + ((items[entry.itemId]?.rarity === "Epic" || items[entry.itemId]?.rarity === "Legendary") ? bossBonusWeight : 0)
   }));
   const drop = pickWeightedDrop(dropTable);
-  const nextStats = addPlayerXp({ ...player.stats, totalXuEarned: player.stats.totalXuEarned + xuGain }, playerXpGain);
+  const playerXpResult = applyPlayerXp({ ...player.stats, totalXuEarned: player.stats.totalXuEarned + xuGain }, playerXpGain);
 
   const updated = await updatePlayer(userId, {
     username,
     wallet: { ...player.wallet, xu: player.wallet.xu + xuGain },
-    stats: nextStats,
+    stats: playerXpResult.stats,
     inventory: addItem(player.inventory, drop.itemId, drop.quantity),
     cooldowns: { ...player.cooldowns, secretRealmAt: getNow() }
   });
@@ -644,6 +646,7 @@ async function exploreSecretRealm(userId, username, realmId, mode = "thuong") {
   return {
     ok: true,
     player: updated,
+    levelInfo: playerXpResult.levelInfo,
     realm,
     mode,
     reward: {

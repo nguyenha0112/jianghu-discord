@@ -85,6 +85,8 @@ Cap nhat lan cuoi: 2026-07-29
 - [x] Asset manifest cho icon / item / profession
 - [x] Monthly reward workflow MVP
 - [x] Workflow.md + repo-local skill de khoa quy trinh lam viec
+- [x] Level up announcement cho `daily` va `work`
+- [x] Embed cute/icon cho reward slash command co ban
 
 ## Next Priority
 
