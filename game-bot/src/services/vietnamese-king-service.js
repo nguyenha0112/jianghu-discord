@@ -2,7 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { EmbedBuilder } = require("discord.js");
 const { lookupVietnameseDictionary } = require("../lib/vietnamese-dictionary");
-const { addPlayerXp } = require("../lib/player-progression");
+const { applyPlayerXp } = require("../lib/player-progression");
+const { formatLevelUpText } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/vietnamese-king-room-store");
@@ -489,13 +490,14 @@ async function rewardPlayer(userId, username, xuGain, xpGain = 0, type = "vietna
     totalWorkActions: 0,
     totalItemsSold: 0
   };
+  const xpResult = applyPlayerXp({ ...safeStats, totalXuEarned: safeStats.totalXuEarned + xuGain }, xpGain);
   const updatedPlayer = await updatePlayer(userId, {
     username,
     wallet: { ...safeWallet, xu: safeWallet.xu + xuGain },
-    stats: addPlayerXp({ ...safeStats, totalXuEarned: safeStats.totalXuEarned + xuGain }, xpGain)
+    stats: xpResult.stats
   });
   appendTransaction({ userId, username, type, changes: { xu: xuGain, playerXp: xpGain } });
-  return updatedPlayer;
+  return { player: updatedPlayer, levelInfo: xpResult.levelInfo };
 }
 
 async function distributeFinalRewards(session) {
@@ -517,10 +519,11 @@ async function distributeFinalRewards(session) {
       totalReward += WIN_BONUS_XU;
       xpGain += WIN_BONUS_XP;
     }
-    const updatedPlayer = await rewardPlayer(userId, username, totalReward, xpGain, "vietnamese_king_final_reward");
+    const rewardResult = await rewardPlayer(userId, username, totalReward, xpGain, "vietnamese_king_final_reward");
     updateVietnameseKingRanking(userId, username, { wins: index === 0 ? 1 : 0, points: score, games: 1 });
+    const levelUpText = formatLevelUpText(rewardResult.levelInfo);
     rewardLines.push(
-      `<@${userId}> có ${score} điểm, nhận 🪙 ${score * POINT_REWARD_XU} Xu${index === 0 ? `, thưởng đứng đầu +🪙 ${WIN_BONUS_XU} Xu` : ""}. +${xpGain} XP. Tổng thưởng: 🪙 ${totalReward} Xu. Số dư hiện tại: 🪙 ${updatedPlayer.wallet.xu} Xu.`
+      `<@${userId}> có ${score} điểm, nhận 🪙 ${score * POINT_REWARD_XU} Xu${index === 0 ? `, thưởng đứng đầu +🪙 ${WIN_BONUS_XU} Xu` : ""}. +${xpGain} XP. Tổng thưởng: 🪙 ${totalReward} Xu. Số dư hiện tại: 🪙 ${rewardResult.player.wallet.xu} Xu.${levelUpText ? ` ${levelUpText}` : ""}`
     );
   }
   return { rewarded: true, lines: rewardLines };
