@@ -105,19 +105,58 @@ function getSuitColor(suit) {
   return suit === "♥" || suit === "♦" ? "🟥" : "⬛";
 }
 
-function formatCardFace(card) {
-  return `${getSuitColor(card.suit)} \`${card.rank}${card.suit}\``;
+function padCardRank(rank) {
+  return String(rank).padEnd(2, " ");
+}
+
+function buildCardAscii(card, hidden = false) {
+  if (hidden) {
+    return ["┌─────┐", "│░░░░░│", "│░░░░░│", "│░░░░░│", "└─────┘"];
+  }
+
+  const rank = padCardRank(card.rank);
+  const suit = card.suit;
+  return [`┌─────┐`, `│${rank}   │`, `│  ${suit}  │`, `│   ${rank.trim().padStart(2, " ")}│`, `└─────┘`];
+}
+
+function mergeCardAscii(cards, options = {}) {
+  const includeHiddenDealerCard = options.includeHiddenDealerCard || false;
+  const asciiCards = cards.map((card) => buildCardAscii(card));
+
+  if (includeHiddenDealerCard) {
+    asciiCards.push(buildCardAscii(null, true));
+  }
+
+  if (asciiCards.length === 0) {
+    return "`Chưa có bài`";
+  }
+
+  const lines = [];
+  for (let index = 0; index < asciiCards[0].length; index += 1) {
+    lines.push(asciiCards.map((cardLines) => cardLines[index]).join(" "));
+  }
+
+  const suitLegend = asciiCards
+    .map((_, idx) => {
+      if (includeHiddenDealerCard && idx === asciiCards.length - 1) {
+        return "🂠";
+      }
+      return getSuitColor(cards[idx]?.suit || "♠");
+    })
+    .join(" ");
+
+  return ["```text", ...lines, "```", suitLegend].join("\n");
 }
 
 function formatCards(cards) {
-  return cards.map((card) => formatCardFace(card)).join("  ");
+  return mergeCardAscii(cards);
 }
 
 function formatDealerPreview(cards) {
   if (!cards.length) {
-    return "Chưa có bài";
+    return "`Chưa có bài`";
   }
-  return `${formatCardFace(cards[0])}  🂠`;
+  return mergeCardAscii([cards[0]], { includeHiddenDealerCard: true });
 }
 
 function createSession({ guildId, channelId, channelName, hostUserId, hostUsername, betAmount }) {
