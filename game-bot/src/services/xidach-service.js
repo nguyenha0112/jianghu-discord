@@ -101,8 +101,23 @@ function getHandScore(cards) {
   return score;
 }
 
+function getSuitColor(suit) {
+  return suit === "♥" || suit === "♦" ? "🟥" : "⬛";
+}
+
+function formatCardFace(card) {
+  return `${getSuitColor(card.suit)} \`${card.rank}${card.suit}\``;
+}
+
 function formatCards(cards) {
-  return cards.map((card) => `\`${card.rank}${card.suit}\``).join(" ");
+  return cards.map((card) => formatCardFace(card)).join("  ");
+}
+
+function formatDealerPreview(cards) {
+  if (!cards.length) {
+    return "Chưa có bài";
+  }
+  return `${formatCardFace(cards[0])}  🂠`;
 }
 
 function createSession({ guildId, channelId, channelName, hostUserId, hostUsername, betAmount }) {
@@ -120,6 +135,7 @@ function createSession({ guildId, channelId, channelName, hostUserId, hostUserna
     deck,
     playerCards,
     dealerCards,
+    statusMessageId: null,
     phase: "playing",
     createdAt: new Date().toISOString()
   };
@@ -208,7 +224,7 @@ function buildBetModal(channelId) {
 
 function buildStatusEmbed(session, note = "Đến lượt người chơi quyết định.") {
   const playerScore = getHandScore(session.playerCards);
-  const dealerVisible = `${session.dealerCards[0].rank}${session.dealerCards[0].suit} ??`;
+  const dealerVisible = formatDealerPreview(session.dealerCards);
 
   return new EmbedBuilder()
     .setColor(0x9b59b6)
@@ -246,6 +262,45 @@ function buildSettlementEmbed(session, resultText) {
         formatCards(session.dealerCards)
       ].join("\n")
     );
+}
+
+async function sendOrRefreshStatusMessage(channel, session, note) {
+  const payload = {
+    embeds: [buildStatusEmbed(session, note)],
+    components: buildActionComponents(session)
+  };
+
+  if (!session.statusMessageId) {
+    const sent = await channel.send(payload);
+    session.statusMessageId = sent.id;
+    return sent;
+  }
+
+  try {
+    const message = await channel.messages.fetch(session.statusMessageId);
+    await message.edit(payload);
+    return message;
+  } catch {
+    const sent = await channel.send(payload);
+    session.statusMessageId = sent.id;
+    return sent;
+  }
+}
+
+async function closeStatusMessage(channel, session) {
+  if (!session?.statusMessageId) {
+    return;
+  }
+
+  try {
+    const message = await channel.messages.fetch(session.statusMessageId);
+    await message.edit({
+      embeds: [buildStatusEmbed(session, "Ván đã kết thúc.")],
+      components: []
+    });
+  } catch {
+    // Bo qua neu khong fetch/edit duoc tin nhan ban choi cu.
+  }
 }
 
 function getHelpText() {
@@ -492,7 +547,30 @@ async function settleSession(channel, session) {
   let payout = 0;
   let xpGain = 0;
 
-  if (playerScore > 21) {
+  if (playerScore > 21 && dealerScore > 21) {
+    payout = session.betAmount;
+    const updated = await adjustPlayerXu(session.hostUserId, session.hostUsername, payout, "xidach_push", {
+      dealerScore,
+      playerScore
+    });
+    resultText = `Cả hai cùng vượt 21 điểm nên ván này hòa. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, {
+      pushes: 1,
+      games: 1,
+      profitXu: 0
+    });
+    addXiDachHistoryEntry({
+      guildId: session.guildId,
+      channelId: session.channelId,
+      userId: session.hostUserId,
+      username: session.hostUsername,
+      resultLabel: "Hòa cùng quắc",
+      betAmount: session.betAmount,
+      netXu: 0,
+      playerScore,
+      dealerScore
+    });
+  } else if (playerScore > 21) {
     resultText = `Bạn đã vượt quá 21 điểm. Bạn thua ${formatXu(session.betAmount)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       games: 1,
@@ -578,6 +656,7 @@ async function settleSession(channel, session) {
   }
 
   sessions.delete(session.channelId);
+  await closeStatusMessage(channel, session);
   await channel.send({ embeds: [buildSettlementEmbed(session, resultText)] }).catch(() => {});
 }
 
@@ -598,11 +677,12 @@ function parseModalCustomId(customId) {
   return channelId ? { channelId } : null;
 }
 
-async function sendStartedRound(interaction, nextSession, betAmount) {
-  await interaction.channel.send({
-    embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`)],
-    components: buildActionComponents(nextSession)
-  });
+async function sendStartedRound(channel, nextSession, betAmount) {
+  await sendOrRefreshStatusMessage(
+    channel,
+    nextSession,
+    `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`
+  );
 }
 
 async function handleButtonInteraction(interaction) {
@@ -630,7 +710,7 @@ async function handleButtonInteraction(interaction) {
         betAmount
       });
 
-      await sendStartedRound(interaction, nextSession, betAmount);
+      await sendStartedRound(interaction.channel, nextSession, betAmount);
       await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
       return true;
     } catch (error) {
@@ -654,7 +734,9 @@ async function handleButtonInteraction(interaction) {
   }
 
   if (parsed.action === "status") {
-    await interaction.reply({ embeds: [buildStatusEmbed(session, "Đây là trạng thái hiện tại của ván.")], ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    await sendOrRefreshStatusMessage(interaction.channel, session, "Đây là trạng thái hiện tại của ván.");
+    await interaction.editReply("Đã cập nhật lại bàn Xì Dách hiện tại.");
     return true;
   }
 
@@ -668,7 +750,8 @@ async function handleButtonInteraction(interaction) {
       return true;
     }
 
-    await interaction.editReply({ embeds: [buildStatusEmbed(session, `Bạn vừa rút thêm bài. Điểm hiện tại: ${playerScore}.`)] });
+    await sendOrRefreshStatusMessage(interaction.channel, session, `Bạn vừa rút thêm bài. Điểm hiện tại: ${playerScore}.`);
+    await interaction.editReply("Đã cập nhật bàn Xì Dách sau lượt rút.");
     return true;
   }
 
@@ -700,7 +783,7 @@ async function handleModalInteraction(interaction) {
       betAmount
     });
 
-    await sendStartedRound(interaction, nextSession, betAmount);
+    await sendStartedRound(interaction.channel, nextSession, betAmount);
     await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
   } catch (error) {
     if (interaction.deferred || interaction.replied) {
@@ -773,10 +856,7 @@ async function handleMessage(message) {
         betAmount
       });
 
-      await message.channel.send({
-        embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`)],
-        components: buildActionComponents(nextSession)
-      });
+      await sendStartedRound(message.channel, nextSession, betAmount);
       return { ok: true, skipReaction: true, silent: true };
     } catch (error) {
       return { ok: false, skipReaction: true, reply: error.message };
