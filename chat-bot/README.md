@@ -1,30 +1,33 @@
-# Discord Vietnamese TTS Bot
+# Chat Bot
 
-Bot đơn giản cho Discord: join/leave voice channel và đọc tin nhắn tiếng Việt từ kênh text.
+Bot chat/TTS chạy riêng cho server Discord.
 
-Setup nhanh:
+## Render
 
-1. Cài Node.js (v16+).
-2. Cài ffmpeg (bắt buộc để chuyển đổi audio). Đảm bảo `ffmpeg` nằm trong PATH.
-3. Clone repo và cài dependencies:
+Nếu deploy riêng `chat-bot`:
 
-```bash
-npm install
+- `Root Directory`: `chat-bot`
+- `Build Command`: `npm install`
+- `Start Command`: `npm start`
+
+Nếu deploy cả `chat-bot` và `game-bot` chung một service ở repo root:
+
+- `Root Directory`: để trống
+- `Build Command`: `npm install`
+- `Start Command`: `npm start`
+
+Khi chạy kiểu chung một service, launcher ở repo root sẽ:
+
+- đọc `DISCORD_TOKEN_1`, `DISCORD_CLIENT_ID_1` cho `chat-bot`
+- đọc `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID` cho `game-bot`
+
+## Env tối thiểu cho chat-bot
+
+```env
+DISCORD_TOKEN_1=YOUR_CHAT_BOT_TOKEN
+DISCORD_CLIENT_ID_1=YOUR_CHAT_BOT_CLIENT_ID
+PREFIX=!
+TTS_CACHE_ITEMS=100
+TTS_COOLDOWN_MS=120000
+TTS_HOSTS=https://translate.google.com,https://translate.google.com.vn
 ```
-
-4. Tạo file `.env` dựa trên `.env.example` và đặt `DISCORD_TOKEN` của bot.
-
-5. Chạy bot:
-
-```bash
-npm start
-```
-
-Commands:
-- `!join` — bot sẽ join voice channel của bạn và bắt đầu đọc tin nhắn ở kênh text hiện tại.
-- `!leave` — rời voice channel.
-- `!tts <nội dung>` — cho bot đọc nội dung ngay lập tức.
-
-Ghi chú:
-- Bot dùng `google-tts-api` với ngôn ngữ `vi` để tạo audio mp3, và `ffmpeg` để transcode sang PCM cho Discord.
-- Đảm bảo bot có quyền `Connect` và `Speak` trong voice channel, và quyền đọc gửi tin nhắn trong text channel.

@@ -1,0 +1,11 @@
+{
+  "name": "discord-server-bot-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root launcher for chat-bot and game-bot on a single Render service",
+  "scripts": {
+    "postinstall": "npm --prefix chat-bot install && npm --prefix game-bot install",
+    "start": "node scripts/start-bots.js",
+    "check": "node --check scripts/start-bots.js"
+  }
+}
