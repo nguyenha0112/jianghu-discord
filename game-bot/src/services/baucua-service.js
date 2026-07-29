@@ -8,7 +8,7 @@ const {
   TextInputStyle
 } = require("discord.js");
 const { addPlayerXp } = require("../lib/player-progression");
-const { emojiToTwemojiUrl } = require("../lib/ui-theme");
+const { buildProgressBar, emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/baucua-room-store");
@@ -28,6 +28,7 @@ const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 const CLOSE_KEYWORDS = new Set(["!chot", "!lac"]);
 const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
 const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
+const PROFILE_KEYWORDS = new Set(["!me", "!toi", "!thongke"]);
 
 const BETTING_DURATION_MS = 30000;
 const MIN_BET = 20;
@@ -234,9 +235,95 @@ function getHistoryText() {
   ].join("\n");
 }
 
+function buildRankingEmbed() {
+  const ranking = getBauCuaRanking(10);
+  return new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("🏆 Bảng Xếp Hạng Bầu Cua")
+    .setThumbnail(emojiToTwemojiUrl("🏆"))
+    .setDescription(
+      ranking.length > 0
+        ? ranking
+            .map(
+              (entry, index) =>
+                `**${index + 1}.** <@${entry.userId}>\nThắng: **${entry.wins}** | Lãi: **${formatXu(entry.profitXu)}** | Ván: **${entry.games}**`
+            )
+            .join("\n\n")
+        : "Bầu Cua chưa có dữ liệu xếp hạng."
+    )
+    .setFooter({ text: "Dùng !me để xem thống kê cá nhân." });
+}
+
+function buildHistoryEmbed() {
+  const history = getBauCuaHistory(8);
+  return new EmbedBuilder()
+    .setColor(0x3498db)
+    .setTitle("🧾 Lịch Sử Bầu Cua Gần Đây")
+    .setThumbnail(emojiToTwemojiUrl("🧾"))
+    .setDescription(
+      history.length > 0
+        ? history
+            .map((entry, index) => {
+              const summary =
+                entry.winners.length > 0
+                  ? entry.winners.map((winner) => `<@${winner.userId}> (+${formatXu(winner.netXu)})`).join(", ")
+                  : "Không ai lãi";
+              return `**${index + 1}.** ${entry.rollLabels.join(" - ")}\nTổng cược: **${formatXu(entry.totalStake)}**\nKết quả: ${summary}`;
+            })
+            .join("\n\n")
+        : "Bầu Cua chưa có lịch sử ván nào."
+    );
+}
+
+function buildProfileEmbed(player, username, rankingEntry) {
+  const totalGames = rankingEntry?.games || 0;
+  const wins = rankingEntry?.wins || 0;
+  const profitXu = rankingEntry?.profitXu || 0;
+  const bestWinXu = rankingEntry?.bestWinXu || 0;
+  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+
+  return new EmbedBuilder()
+    .setColor(0x2ecc71)
+    .setTitle("🎋 Hồ Sơ Bầu Cua")
+    .setThumbnail(emojiToTwemojiUrl("🎋"))
+    .setDescription(`<@${player.userId}> - **${username}**`)
+    .addFields(
+      {
+        name: "🪙 Ví hiện tại",
+        value: `Xu: **${formatXu(player.wallet.xu)}**\nNgọc: **${formatNumber(player.wallet.ngoc)}**`,
+        inline: true
+      },
+      {
+        name: "🎮 Thành tích Bầu Cua",
+        value: `Ván: **${totalGames}**\nThắng: **${wins}**\nTỉ lệ thắng: **${winRate}%**`,
+        inline: true
+      },
+      {
+        name: "📈 Hiệu suất",
+        value: `Lãi ròng: **${formatXu(profitXu)}**\nĂn đậm nhất: **${formatXu(bestWinXu)}**`,
+        inline: false
+      },
+      {
+        name: "✨ Tu vi tổng",
+        value: `Cấp: **${player.stats.playerLevel}**\nXP: **${player.stats.playerXp}/100**\n${buildProgressBar(player.stats.playerXp, 100, 12)}`,
+        inline: false
+      }
+    );
+}
+
 async function ensureWalletPlayer(userId, username) {
   await ensurePlayer(userId, username);
   return getPlayer(userId);
+}
+
+async function getProfilePayload(userId, username) {
+  const player = await ensureWalletPlayer(userId, username);
+  const rankingEntry = getBauCuaRanking(200).find((entry) => entry.userId === userId) || null;
+  return {
+    ok: true,
+    skipReaction: true,
+    embeds: [buildProfileEmbed(player, username, rankingEntry)]
+  };
 }
 
 async function adjustPlayerXu(userId, username, amount, type, extra = {}) {
@@ -563,10 +650,13 @@ async function handleMessage(message) {
       return { ok: true, skipReaction: true, reply: getHelpText() };
     }
     if (RANKING_KEYWORDS.has(lowered)) {
-      return { ok: true, skipReaction: true, reply: getRankingText() };
+      return { ok: true, skipReaction: true, embeds: [buildRankingEmbed()] };
     }
     if (HISTORY_KEYWORDS.has(lowered)) {
-      return { ok: true, skipReaction: true, reply: getHistoryText() };
+      return { ok: true, skipReaction: true, embeds: [buildHistoryEmbed()] };
+    }
+    if (PROFILE_KEYWORDS.has(lowered)) {
+      return getProfilePayload(message.author.id, message.author.username);
     }
     if (STATUS_KEYWORDS.has(lowered)) {
       return { ok: true, skipReaction: true, reply: "Hiện chưa có kèo Bầu Cua nào đang mở." };
@@ -599,10 +689,13 @@ async function handleMessage(message) {
     return { ok: true, skipReaction: true, reply: getHelpText() };
   }
   if (RANKING_KEYWORDS.has(lowered)) {
-    return { ok: true, skipReaction: true, reply: getRankingText() };
+    return { ok: true, skipReaction: true, embeds: [buildRankingEmbed()] };
   }
   if (HISTORY_KEYWORDS.has(lowered)) {
-    return { ok: true, skipReaction: true, reply: getHistoryText() };
+    return { ok: true, skipReaction: true, embeds: [buildHistoryEmbed()] };
+  }
+  if (PROFILE_KEYWORDS.has(lowered)) {
+    return getProfilePayload(message.author.id, message.author.username);
   }
   if (STATUS_KEYWORDS.has(lowered)) {
     await sendOrRefreshStatusMessage(message.channel, session, "Đây là trạng thái hiện tại của kèo Bầu Cua.");

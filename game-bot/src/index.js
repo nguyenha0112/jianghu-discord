@@ -208,8 +208,18 @@ client.on(Events.MessageCreate, async (message) => {
     await message.react("❌").catch(() => {});
   }
 
-  if (finalResult.reply && !finalResult.silent) {
-    await message.reply(finalResult.reply).catch(() => {});
+  if (!finalResult.silent && (finalResult.reply || finalResult.embeds || finalResult.components)) {
+    const payload = {};
+    if (finalResult.reply) {
+      payload.content = finalResult.reply;
+    }
+    if (finalResult.embeds) {
+      payload.embeds = finalResult.embeds;
+    }
+    if (finalResult.components) {
+      payload.components = finalResult.components;
+    }
+    await message.reply(payload).catch(() => {});
   }
 });
 

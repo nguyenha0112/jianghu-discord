@@ -1,6 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
 const { addPlayerXp } = require("../lib/player-progression");
-const { emojiToTwemojiUrl } = require("../lib/ui-theme");
+const { buildProgressBar, emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
@@ -19,6 +19,7 @@ const HELP_KEYWORDS = new Set(["!help", "!huongdan"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
 const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
+const PROFILE_KEYWORDS = new Set(["!me", "!toi", "!thongke"]);
 
 const MIN_BET = 20;
 const MAX_BET = 250000;
@@ -209,6 +210,80 @@ function getHistoryText() {
   ].join("\n");
 }
 
+function buildRankingEmbed() {
+  const ranking = getXiDachRanking(10);
+  return new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("🏆 Bảng Xếp Hạng Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setDescription(
+      ranking.length > 0
+        ? ranking
+            .map(
+              (entry, index) =>
+                `**${index + 1}.** <@${entry.userId}>\nThắng: **${entry.wins}** | Hòa: **${entry.pushes}** | Lãi: **${formatXu(entry.profitXu)}** | Ván: **${entry.games}**`
+            )
+            .join("\n\n")
+        : "Xì Dách chưa có dữ liệu xếp hạng."
+    )
+    .setFooter({ text: "Dùng !me để xem thống kê cá nhân." });
+}
+
+function buildHistoryEmbed() {
+  const history = getXiDachHistory(8);
+  return new EmbedBuilder()
+    .setColor(0x3498db)
+    .setTitle("🧾 Lịch Sử Xì Dách Gần Đây")
+    .setThumbnail(emojiToTwemojiUrl("🧾"))
+    .setDescription(
+      history.length > 0
+        ? history
+            .map(
+              (entry, index) =>
+                `**${index + 1}.** <@${entry.userId}>\nKết quả: **${entry.resultLabel}** | Cược: **${formatXu(entry.betAmount)}**\nLãi: **${formatXu(entry.netXu)}** | Điểm: **${entry.playerScore}-${entry.dealerScore}**`
+            )
+            .join("\n\n")
+        : "Xì Dách chưa có lịch sử ván nào."
+    );
+}
+
+function buildProfileEmbed(player, username, rankingEntry) {
+  const totalGames = rankingEntry?.games || 0;
+  const wins = rankingEntry?.wins || 0;
+  const pushes = rankingEntry?.pushes || 0;
+  const profitXu = rankingEntry?.profitXu || 0;
+  const bestWinXu = rankingEntry?.bestWinXu || 0;
+  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+
+  return new EmbedBuilder()
+    .setColor(0x9b59b6)
+    .setTitle("🃏 Hồ Sơ Xì Dách")
+    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setDescription(`<@${player.userId}> - **${username}**`)
+    .addFields(
+      {
+        name: "🪙 Ví hiện tại",
+        value: `Xu: **${formatXu(player.wallet.xu)}**\nNgọc: **${formatNumber(player.wallet.ngoc)}**`,
+        inline: true
+      },
+      {
+        name: "🎮 Thành tích Xì Dách",
+        value: `Ván: **${totalGames}**\nThắng: **${wins}**\nHòa: **${pushes}**\nTỉ lệ thắng: **${winRate}%**`,
+        inline: true
+      },
+      {
+        name: "📈 Hiệu suất",
+        value: `Lãi ròng: **${formatXu(profitXu)}**\nĂn đậm nhất: **${formatXu(bestWinXu)}**`,
+        inline: false
+      },
+      {
+        name: "✨ Tu vi tổng",
+        value: `Cấp: **${player.stats.playerLevel}**\nXP: **${player.stats.playerXp}/100**\n${buildProgressBar(player.stats.playerXp, 100, 12)}`,
+        inline: false
+      }
+    );
+}
+
 function buildRoomGuideText() {
   return [
     "**Phòng Xì Dách đã sẵn sàng.**",
@@ -221,6 +296,16 @@ function buildRoomGuideText() {
 async function ensureWalletPlayer(userId, username) {
   await ensurePlayer(userId, username);
   return getPlayer(userId);
+}
+
+async function getProfilePayload(userId, username) {
+  const player = await ensureWalletPlayer(userId, username);
+  const rankingEntry = getXiDachRanking(200).find((entry) => entry.userId === userId) || null;
+  return {
+    ok: true,
+    skipReaction: true,
+    embeds: [buildProfileEmbed(player, username, rankingEntry)]
+  };
 }
 
 async function adjustPlayerXu(userId, username, amount, type, extra = {}) {
@@ -466,10 +551,13 @@ async function handleMessage(message) {
     return { ok: true, skipReaction: true, reply: getHelpText() };
   }
   if (RANKING_KEYWORDS.has(lowered)) {
-    return { ok: true, skipReaction: true, reply: getRankingText() };
+    return { ok: true, skipReaction: true, embeds: [buildRankingEmbed()] };
   }
   if (HISTORY_KEYWORDS.has(lowered)) {
-    return { ok: true, skipReaction: true, reply: getHistoryText() };
+    return { ok: true, skipReaction: true, embeds: [buildHistoryEmbed()] };
+  }
+  if (PROFILE_KEYWORDS.has(lowered)) {
+    return getProfilePayload(message.author.id, message.author.username);
   }
 
   if (STATUS_KEYWORDS.has(lowered)) {
