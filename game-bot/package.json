@@ -9,6 +9,7 @@
     "check": "node --check src/index.js",
     "check:register": "node --check src/register-commands.js",
     "db:test": "node src/scripts/test-supabase.js",
+    "db:sync-local": "node src/scripts/sync-local-to-supabase.js",
     "flow:test": "node src/scripts/test-game-flow.js",
     "wordchain:test": "node src/scripts/test-word-chain-modes.js",
     "wordchain:dict:test": "node src/scripts/test-word-chain-dictionary.js",

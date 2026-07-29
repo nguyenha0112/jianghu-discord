@@ -18,3 +18,12 @@ create unique index if not exists game_rooms_game_key_channel_id_idx
 
 create index if not exists game_rooms_game_key_enabled_idx
   on public.game_rooms (game_key, enabled);
+
+alter table public.game_rooms enable row level security;
+
+create policy "service_role_full_game_rooms"
+on public.game_rooms
+for all
+to service_role
+using (true)
+with check (true);
