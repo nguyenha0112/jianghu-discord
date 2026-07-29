@@ -2,18 +2,24 @@ const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { buyShopItem, getShopListings } = require("../services/game-service");
 const { emojiToTwemojiUrl, formatItemLabel, getItemTheme } = require("../lib/ui-theme");
 
+const shopChoices = getShopListings().map((entry) => ({
+  name: `${entry.name} - ${entry.price} ${entry.currencyName}`,
+  value: entry.shopId
+}));
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("shop")
     .setDescription("Xem hoac mua vat pham trong shop.")
     .addStringOption((option) =>
       option
-        .setName("shop_id")
-        .setDescription("Nhap shop_id neu muon mua ngay")
+        .setName("vat_pham")
+        .setDescription("Chon vat pham muon mua ngay")
         .setRequired(false)
+        .addChoices(...shopChoices)
     ),
   async execute(interaction) {
-    const shopId = interaction.options.getString("shop_id");
+    const shopId = interaction.options.getString("vat_pham");
 
     if (shopId) {
       const result = await buyShopItem(interaction.user.id, interaction.user.username, shopId);
@@ -37,12 +43,10 @@ module.exports = {
       .setThumbnail(emojiToTwemojiUrl(firstTheme.emoji))
       .setDescription(
         listings
-          .map((entry) => {
-            return `\`${entry.shopId}\`\n${formatItemLabel(entry.itemId, entry.quantity)}\nGiá: **${entry.price} ${entry.currencyName}**\n${entry.description}`;
-          })
+          .map((entry) => `${formatItemLabel(entry.itemId, entry.quantity)}\nGiá: **${entry.price} ${entry.currencyName}**\n${entry.description}`)
           .join("\n\n")
       )
-      .setFooter({ text: "Dùng /shop với shop_id để mua ngay một vật phẩm." });
+      .setFooter({ text: "Dùng /shop rồi chọn mục 'vat_pham' nếu muốn mua ngay." });
 
     await interaction.reply({ embeds: [embed] });
   }
