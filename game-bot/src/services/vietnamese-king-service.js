@@ -13,6 +13,7 @@ const DATA_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-puzz
 const CUSTOM_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
 const BONUS_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-phrases.txt");
 const BONUS_PUZZLES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-puzzles.json");
+const ULTRA_PUZZLES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-ultra-puzzles.json");
 const sessions = new Map();
 const recentPuzzleIdsByGuild = new Map();
 
@@ -27,8 +28,8 @@ const POINT_REWARD_XU = 8;
 const WIN_BONUS_XU = 20;
 const POINT_REWARD_XP = 5;
 const WIN_BONUS_XP = 15;
-const MAX_RECENT_PUZZLES = 120;
-const MAX_GLOBAL_RECENT_PUZZLES = 360;
+const MAX_RECENT_PUZZLES = 180;
+const MAX_GLOBAL_RECENT_PUZZLES = 600;
 const HINT_POINT_PENALTY = 1;
 
 function inferDifficultyFromAnswer(answer) {
@@ -139,7 +140,8 @@ function loadCuratedPuzzles(filePath) {
 function loadPuzzleBank() {
   const curated = [
     ...loadCuratedPuzzles(DATA_PATH),
-    ...loadCuratedPuzzles(BONUS_PUZZLES_PATH)
+    ...loadCuratedPuzzles(BONUS_PUZZLES_PATH),
+    ...loadCuratedPuzzles(ULTRA_PUZZLES_PATH)
   ];
   const generated = [
     ...loadGeneratedPhrasePuzzles(CUSTOM_PHRASES_PATH, "custom"),
@@ -300,13 +302,34 @@ function getPuzzlePriorityScore(puzzle) {
 
 function getTargetDifficulty(session) {
   const moveCount = session.moveCount || 0;
-  if (moveCount >= 4 && moveCount % 4 === 0) {
+  if (moveCount === 0) {
+    return "easy";
+  }
+  if (moveCount % 5 === 4) {
     return "hard";
   }
-  if (moveCount >= 2) {
+  if (moveCount % 2 === 1 || moveCount >= 2) {
     return "medium";
   }
   return "easy";
+}
+
+function getTargetType(session) {
+  const moveCount = session.moveCount || 0;
+  if (moveCount > 0 && moveCount % 5 === 4) {
+    return "ca_dao";
+  }
+  if (moveCount > 0 && moveCount % 3 === 2) {
+    return "proverb";
+  }
+  return "word";
+}
+
+function getRecentPuzzleTypes(session) {
+  return (session.usedPuzzleIds || [])
+    .slice(-4)
+    .map((puzzleId) => puzzleBank.find((entry) => entry.id === puzzleId)?.type)
+    .filter(Boolean);
 }
 
 function pickPuzzle(session) {
@@ -319,15 +342,33 @@ function pickPuzzle(session) {
   }
 
   const targetDifficulty = getTargetDifficulty(session);
+  const targetType = getTargetType(session);
   const difficultyPool = pool.filter((item) => item.difficulty === targetDifficulty);
-  const effectivePool = difficultyPool.length >= 20 ? difficultyPool : pool;
+  const typePool = difficultyPool.filter((item) => item.type === targetType);
+  const effectivePool = typePool.length >= 12 ? typePool : difficultyPool.length >= 20 ? difficultyPool : pool;
+  const recentTypes = getRecentPuzzleTypes(session);
   const scored = effectivePool
-    .map((item) => ({ item, score: getPuzzlePriorityScore(item) }))
+    .map((item) => {
+      let score = getPuzzlePriorityScore(item);
+      if (item.type === targetType) {
+        score += 45;
+      }
+      if (item.difficulty === targetDifficulty) {
+        score += 30;
+      }
+      if (recentTypes[recentTypes.length - 1] === item.type) {
+        score -= 30;
+      }
+      if (recentTypes.filter((type) => type === item.type).length >= 2) {
+        score -= 20;
+      }
+      return { item, score };
+    })
     .sort((left, right) => right.score - left.score);
 
   const topScore = scored[0]?.score ?? 0;
   const candidatePool = scored
-    .filter((entry) => entry.score >= topScore - 60)
+    .filter((entry) => entry.score >= topScore - 70)
     .map((entry) => entry.item);
 
   return candidatePool[Math.floor(Math.random() * candidatePool.length)];

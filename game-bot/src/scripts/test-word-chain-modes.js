@@ -119,7 +119,9 @@ async function runPveFlow() {
 
   const playResult = await handleWordChainMessage(createMessage(channel, "guild-2", validReply, "u3", "Carol"));
   if (!playResult?.ok || playResult.react !== "success") {
-    throw new Error("PvE valid move rejected");
+    throw new Error(
+      `PvE valid move rejected | seed=${sessionAfterStart.currentPhrase} | required=${sessionAfterStart.requiredToken} | reply=${validReply} | result=${JSON.stringify(playResult)}`
+    );
   }
 
   stopSession(channelId);

@@ -55,6 +55,7 @@ const customPhraseSet = new Set(phraseCatalog.customPhrases);
 const referencePhraseSet = new Set(phraseCatalog.referencePhrases);
 const bannedPhraseSet = new Set(phraseCatalog.bannedPhrases);
 const preferredPhraseSet = new Set(phraseCatalog.preferredPhrases);
+const phrasesByFirstToken = buildPhraseIndex(validPhraseSet);
 
 function loadPhraseCatalog() {
   try {
@@ -119,6 +120,21 @@ function loadPhraseFile(filePath) {
     .map((line) => normalizePhrase(line))
     .filter(Boolean)
     .filter((phrase) => splitTokens(phrase).length === 2);
+}
+
+function buildPhraseIndex(phrases) {
+  const index = new Map();
+  for (const phrase of phrases) {
+    const firstToken = getFirstToken(phrase);
+    if (!firstToken) {
+      continue;
+    }
+    if (!index.has(firstToken)) {
+      index.set(firstToken, []);
+    }
+    index.get(firstToken).push(phrase);
+  }
+  return index;
 }
 
 function normalizePhrase(input) {
@@ -238,10 +254,7 @@ function countAvailableFollowups(token, session, phraseToExclude = null) {
   const normalizedToken = normalizePhrase(token).replace(/!/gu, "").trim();
   let count = 0;
 
-  for (const phrase of validPhraseSet) {
-    if (getFirstToken(phrase) !== normalizedToken) {
-      continue;
-    }
+  for (const phrase of phrasesByFirstToken.get(normalizedToken) || []) {
     if (session.roundUsed?.has(phrase)) {
       continue;
     }
@@ -256,7 +269,38 @@ function countAvailableFollowups(token, session, phraseToExclude = null) {
   return count;
 }
 
-function pickSeedPhrase(guildId, excludedPhrases = []) {
+function getCandidateRepliesForToken(token, session, excludedPhrases = []) {
+  const normalizedToken = normalizePhrase(token).replace(/!/gu, "").trim();
+  const excluded = new Set(excludedPhrases.map((phrase) => normalizePhrase(phrase)));
+
+  return (phrasesByFirstToken.get(normalizedToken) || []).filter((phrase) => {
+    if (excluded.has(phrase)) {
+      return false;
+    }
+    if (session.roundUsed?.has(phrase)) {
+      return false;
+    }
+    if (session.guildId && findRecentUsage(session.guildId, phrase)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function evaluatePveSeedPhrase(phrase, guildId) {
+  const requiredToken = getLastToken(phrase);
+  const playerReplies = getCandidateRepliesForToken(requiredToken, { guildId, roundUsed: new Set([phrase]) }, [phrase]);
+  const replyCount = playerReplies.length;
+  const targetReplyCount = 5;
+  const averageReplyPreference =
+    replyCount > 0 ? playerReplies.reduce((sum, item) => sum + getPhrasePreferenceScore(item), 0) / replyCount : 0;
+  const closenessScore = Math.max(0, 40 - Math.abs(replyCount - targetReplyCount) * 6);
+  const difficultyScore = replyCount === 0 ? -120 : replyCount <= 2 ? -35 : replyCount <= 8 ? 35 : replyCount <= 14 ? 20 : 5;
+  const naturalnessScore = averageReplyPreference >= 50 ? 25 : averageReplyPreference >= 20 ? 12 : -30;
+  return getPhrasePreferenceScore(phrase) + closenessScore + difficultyScore + naturalnessScore;
+}
+
+function pickSeedPhrase(guildId, excludedPhrases = [], mode = "pvp") {
   const excluded = new Set(excludedPhrases.map((phrase) => normalizePhrase(phrase)));
   const seedPool = [...new Set([...preferredPhraseSet, ...customPhraseSet, ...FALLBACK_SEEDS.map((item) => normalizePhrase(item))])].filter(
     (phrase) => splitTokens(phrase).length === 2 && !excluded.has(phrase) && !findRecentUsage(guildId, phrase)
@@ -269,7 +313,10 @@ function pickSeedPhrase(guildId, excludedPhrases = []) {
 
   const scored = seedPool.map((phrase) => ({
     phrase,
-    score: getPhrasePreferenceScore(phrase) + countAvailableFollowups(getLastToken(phrase), { guildId: "__seed__", roundUsed: new Set([phrase]) }, phrase)
+    score:
+      mode === "pve"
+        ? evaluatePveSeedPhrase(phrase, guildId)
+        : getPhrasePreferenceScore(phrase) + countAvailableFollowups(getLastToken(phrase), { guildId: "__seed__", roundUsed: new Set([phrase]) }, phrase)
   }));
   const bestScore = Math.max(...scored.map((item) => item.score));
   const candidateSeeds = scored.filter((item) => item.score >= bestScore - 10).map((item) => item.phrase);
@@ -498,7 +545,7 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
   const roomMode = mode || getRoomMode(channelId);
   const session = createBaseSession({ guildId, channelId, channelName, hostUserId, hostUsername, mode: roomMode });
 
-  const seed = normalizePhrase(seedPhrase || pickSeedPhrase(guildId)).replace(/!/gu, "").trim();
+  const seed = normalizePhrase(seedPhrase || pickSeedPhrase(guildId, [], roomMode)).replace(/!/gu, "").trim();
   if (!isMeaningfulPhrase(seed)) {
     throw new Error("Cụm mở đầu phải là một cụm 2 tiếng có nghĩa nằm trong bộ từ của game.");
   }
@@ -652,18 +699,60 @@ function trackUnknownPhrase(messageLike, phrase) {
 }
 
 function listCandidateReplies(session) {
-  return [...validPhraseSet].filter((phrase) => {
-    if (getFirstToken(phrase) !== session.requiredToken) {
-      return false;
+  return getCandidateRepliesForToken(session.requiredToken, session);
+}
+
+function buildHypotheticalSession(session, extraUsed = []) {
+  return {
+    guildId: session.guildId,
+    roundUsed: new Set([...(session.roundUsed || new Set()), ...extraUsed])
+  };
+}
+
+function evaluateBotReplyStrength(session, phrase) {
+  const nextToken = getLastToken(phrase);
+  const humanReplies = getCandidateRepliesForToken(nextToken, session, [phrase]).slice(0, 10);
+
+  if (humanReplies.length === 0) {
+    return 100000 + getPhrasePreferenceScore(phrase);
+  }
+
+  let totalBotCounters = 0;
+  let minBotCounters = Number.POSITIVE_INFINITY;
+  let trapReplies = 0;
+
+  for (const humanReply of humanReplies) {
+    const hypothetical = buildHypotheticalSession(session, [phrase, humanReply]);
+    const botCounters = getCandidateRepliesForToken(getLastToken(humanReply), hypothetical, [phrase, humanReply]).slice(0, 12);
+    const counterCount = botCounters.length;
+
+    totalBotCounters += counterCount;
+    minBotCounters = Math.min(minBotCounters, counterCount);
+
+    if (counterCount > 0) {
+      const hasTrapCounter = botCounters.some((counterPhrase) => {
+        const counterSession = buildHypotheticalSession(session, [phrase, humanReply, counterPhrase]);
+        const playerOptionsAfterCounter = getCandidateRepliesForToken(getLastToken(counterPhrase), counterSession, [
+          phrase,
+          humanReply,
+          counterPhrase
+        ]);
+        return playerOptionsAfterCounter.length === 0;
+      });
+
+      if (hasTrapCounter) {
+        trapReplies += 1;
+      }
     }
-    if (session.roundUsed.has(phrase)) {
-      return false;
-    }
-    if (findRecentUsage(session.guildId, phrase)) {
-      return false;
-    }
-    return true;
-  });
+  }
+
+  const averageBotCounters = totalBotCounters / humanReplies.length;
+  const pressureScore = -humanReplies.length * 24;
+  const counterScore = averageBotCounters * 8 + minBotCounters * 10;
+  const trapScore = trapReplies * 18;
+  const preferenceScore = getPhrasePreferenceScore(phrase) * 4;
+
+  return preferenceScore + pressureScore + counterScore + trapScore;
 }
 
 function chooseBotReply(session) {
@@ -671,25 +760,33 @@ function chooseBotReply(session) {
   if (candidates.length === 0) {
     return null;
   }
-  let bestPhrase = null;
-  let bestScore = Number.NEGATIVE_INFINITY;
-  for (const phrase of candidates) {
-    const score = getPhrasePreferenceScore(phrase) + countAvailableFollowups(getLastToken(phrase), session, phrase);
-    if (score > bestScore || (score === bestScore && bestPhrase && phrase.localeCompare(bestPhrase, "vi") < 0)) {
-      bestPhrase = phrase;
-      bestScore = score;
-    }
-  }
-  return bestPhrase;
+
+  const shortlisted = candidates
+    .map((phrase) => ({
+      phrase,
+      replyCount: countAvailableFollowups(getLastToken(phrase), session, phrase),
+      preference: getPhrasePreferenceScore(phrase)
+    }))
+    .sort((left, right) => left.replyCount - right.replyCount || right.preference - left.preference || left.phrase.localeCompare(right.phrase, "vi"))
+    .slice(0, 18)
+    .map((entry) => entry.phrase);
+
+  const scored = shortlisted
+    .map((phrase) => ({
+      phrase,
+      score: evaluateBotReplyStrength(session, phrase)
+    }))
+    .sort((left, right) => right.score - left.score || left.phrase.localeCompare(right.phrase, "vi"));
+
+  const bestScore = scored[0]?.score ?? Number.NEGATIVE_INFINITY;
+  const topBand = scored.filter((entry) => entry.score >= bestScore - 8).map((entry) => entry.phrase);
+  return topBand[Math.floor(Math.random() * topBand.length)] || scored[0]?.phrase || null;
 }
 
 function findPlayablePhraseForToken(requiredToken, guildId, excludedPhrases = []) {
   const excluded = new Set(excludedPhrases.map((phrase) => normalizePhrase(phrase)));
   const normalizedToken = normalizePhrase(requiredToken).replace(/!/gu, "").trim();
-  const candidates = [...validPhraseSet].filter((phrase) => {
-    if (getFirstToken(phrase) !== normalizedToken) {
-      return false;
-    }
+  const candidates = (phrasesByFirstToken.get(normalizedToken) || []).filter((phrase) => {
     if (excluded.has(phrase)) {
       return false;
     }
@@ -704,10 +801,7 @@ function findPlayablePhraseForToken(requiredToken, guildId, excludedPhrases = []
 
 function findDeadEndPhraseForSession(session, token) {
   const normalizedToken = normalizePhrase(token).replace(/!/gu, "").trim();
-  const candidates = [...validPhraseSet].filter((phrase) => {
-    if (getFirstToken(phrase) !== normalizedToken) {
-      return false;
-    }
+  const candidates = (phrasesByFirstToken.get(normalizedToken) || []).filter((phrase) => {
     if (session.roundUsed.has(phrase)) {
       return false;
     }
