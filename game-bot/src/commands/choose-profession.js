@@ -1,15 +1,15 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { chooseProfession } = require("../services/game-service");
-const { getProfessionTheme } = require("../lib/ui-theme");
+const { emojiToTwemojiUrl, getProfessionTheme } = require("../lib/ui-theme");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("choose-profession")
-    .setDescription("Chọn đạo tu chính của bạn.")
+    .setDescription("Chon dao tu chinh cua ban.")
     .addStringOption((option) =>
       option
         .setName("profession")
-        .setDescription("Đạo tu bạn muốn theo")
+        .setDescription("Dao tu ban muon theo")
         .setRequired(true)
         .addChoices(
           { name: "Ngư Đạo", value: "fishing" },
@@ -24,8 +24,26 @@ module.exports = {
     await chooseProfession(interaction.user.id, interaction.user.username, professionId);
     const professionTheme = getProfessionTheme(professionId);
 
-    await interaction.reply(
-      `${professionTheme.emoji} Bạn đã nhập đạo theo hướng **${professionTheme.name}**. Đây sẽ là đạo tu chính để farm tài nguyên, luyện công và chuẩn bị đột phá cảnh giới trong Jianghu.`
-    );
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(professionTheme.color)
+          .setTitle(`${professionTheme.emoji} Đã Chọn Đạo Tu Chính`)
+          .setThumbnail(emojiToTwemojiUrl(professionTheme.emoji))
+          .setDescription(`Bạn đã nhập đạo theo hướng **${professionTheme.name}**.`)
+          .addFields(
+            {
+              name: "Vai trò",
+              value: "Đây sẽ là hướng farm chính để kiếm tài nguyên, tăng cấp nghề và mở khóa các mốc đột phá.",
+              inline: false
+            },
+            {
+              name: "Gợi ý tiếp theo",
+              value: "Dùng `/work` để bắt đầu farm, `/tutien` để xem tổng quan và `/dongphu` để chuẩn bị hướng nâng cấp lâu dài.",
+              inline: false
+            }
+          )
+      ]
+    });
   }
 };

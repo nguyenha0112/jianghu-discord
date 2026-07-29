@@ -75,10 +75,10 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("admin-transactions")
     .setDescription("Xem giao dich gan nhat.")
-    .addStringOption((option) =>
+    .addUserOption((option) =>
       option
-        .setName("user_id")
-        .setDescription("Loc theo Discord user ID")
+        .setName("nguoi_choi")
+        .setDescription("Loc theo nguoi choi")
         .setRequired(false)
     )
     .addIntegerOption((option) =>
@@ -91,9 +91,9 @@ module.exports = {
     ),
   async execute(interaction) {
     try {
-      const userId = interaction.options.getString("user_id");
+      const targetUser = interaction.options.getUser("nguoi_choi");
       const limit = interaction.options.getInteger("limit") || 10;
-      const rows = await getRecentTransactions(interaction.user.id, userId, limit);
+      const rows = await getRecentTransactions(interaction.user.id, targetUser?.id || null, limit);
 
       const description =
         rows.length === 0
@@ -101,11 +101,15 @@ module.exports = {
           : rows
               .map(
                 (row) =>
-                  `• **${row.username}**\nThoi gian: ${formatDateTime(row.created_at)}\nLoai: \`${row.type}\`\nNoi dung: ${formatChanges(row.type, row.changes)}`
+                  `• **${row.username}**\nThời gian: ${formatDateTime(row.created_at)}\nLoại: \`${row.type}\`\nNội dung: ${formatChanges(row.type, row.changes)}`
               )
               .join("\n\n");
 
-      const embed = new EmbedBuilder().setTitle("Admin Transactions").setDescription(description.slice(0, 4000));
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle("Admin Transactions")
+        .setDescription(description.slice(0, 4000))
+        .setFooter({ text: targetUser ? `Đang lọc theo ${targetUser.username}` : "Đang hiển thị giao dịch toàn hệ thống" });
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error) {
