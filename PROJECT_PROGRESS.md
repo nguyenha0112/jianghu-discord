@@ -1,6 +1,6 @@
 # Project Progress
 
-Cap nhat lan cuoi: 2026-07-27
+Cap nhat lan cuoi: 2026-07-29
 
 ## Design Documents
 
@@ -16,6 +16,8 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Them README tong quan
 - [x] Them CI co syntax check va secret scan
 - [x] Them push guard cho file nhay cam
+- [x] Them `WORKFLOW.md`
+- [x] Them repo-local skill `jianghu-project-workflow`
 
 ## Utility Bot
 
@@ -37,6 +39,10 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Sell item de doi Xu
 - [x] Transaction log MVP
 - [x] Noi tu MVP
+- [x] Noi tu PvP / PvE live
+- [x] Tai Xiu room system MVP
+- [x] Vua Tieng Viet MVP
+- [x] Chuyen Xu giua player
 
 ## Currency and Progression
 
@@ -45,25 +51,30 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Tong hop thong ke kinh te co ban
 - [x] Shop MVP
 - [x] Crafting MVP
+- [x] Tu tien foundation
+- [x] Bi canh / dong phu / phap bao foundation
 - [ ] Currency sink balancing v1
+- [ ] Reward scaling / anti-farm balancing v1
 
 ## Discord Runtime
 
 - [x] Dang ky guild slash commands
-- [ ] Test lenh `ping`
-- [ ] Test lenh `daily`
-- [ ] Test lenh `work`
-- [ ] Test lenh `sell`
-- [ ] Test lenh `shop`
-- [ ] Test lenh `craft`
+- [x] Test lenh `ping`
+- [x] Test lenh `daily`
+- [x] Test lenh `work`
+- [x] Test lenh `sell`
+- [x] Test lenh `shop`
+- [x] Test lenh `craft`
+- [x] Test `wordchain:test`
+- [x] Test `vttv:test`
+- [x] Test `taixiu:test`
 
-## Near-term Roadmap
+## Current Priority
 
 - [x] Shop va crafting MVP
-- [ ] Tool progression
-- [ ] Recipe balance
 - [x] Admin economy log command
-- [x] Noi tu reward balancing
+- [x] Noi tu reward balancing phase 1
+- [x] Noi tu PvP checkpoint reward phase 1
 - [x] Ket noi Supabase project
 - [x] Test ket noi Supabase thanh cong
 - [x] Chuyen player va transaction storage sang Supabase
@@ -73,4 +84,23 @@ Cap nhat lan cuoi: 2026-07-27
 - [x] Tao bang traceability requirement -> implementation
 - [x] Asset manifest cho icon / item / profession
 - [x] Monthly reward workflow MVP
+- [x] Workflow.md + repo-local skill de khoa quy trinh lam viec
+
+## Next Priority
+
+- [ ] Economy balancing v1
+- [ ] Reward scaling full pass cho Noi Tu / VTTV / Tai Xiu
+- [ ] Supabase schema fix cho cultivation columns de bo fallback JSON
+- [ ] Tool progression
+- [ ] Recipe balance
 - [ ] Noi Tu strict config / allowlist
+- [ ] Vua Tieng Viet mo rong data curated medium / hard
+- [ ] Daily / weekly quest system
+- [ ] Admin controls / moderation tools cho minigame
+
+## Later Priority
+
+- [ ] Seed data V1
+- [ ] Production UAT checklist
+- [ ] Member guide va admin guide
+- [ ] Branch / PR production release flow docs
