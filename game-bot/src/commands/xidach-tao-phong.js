@@ -23,7 +23,7 @@ module.exports = {
       });
 
       if (interaction.channel && "setTopic" in interaction.channel && typeof interaction.channel.setTopic === "function") {
-        const nextTopic = "Xì Dách | !play 1000 mở ván | bấm Rút/Dừng để chơi | !stop hủy";
+        const nextTopic = "Xì Dách | !play mở bảng cược | có nút nhập tiền | Rút/Dừng để chơi | !stop hủy";
         await interaction.channel.setTopic(nextTopic).catch(() => {});
       }
 

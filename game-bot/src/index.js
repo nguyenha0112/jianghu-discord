@@ -16,7 +16,8 @@ const {
 } = require("./services/baucua-service");
 const {
   handleMessage: handleXiDachMessage,
-  handleButtonInteraction: handleXiDachButtonInteraction
+  handleButtonInteraction: handleXiDachButtonInteraction,
+  handleModalInteraction: handleXiDachModalInteraction
 } = require("./services/xidach-service");
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 
@@ -153,6 +154,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return false;
     });
     if (bauCuaModalHandled) {
+      return;
+    }
+
+    const xiDachModalHandled = await handleXiDachModalInteraction(interaction).catch((error) => {
+      console.error("Xi Dach modal interaction failed", error);
+      return false;
+    });
+    if (xiDachModalHandled) {
       return;
     }
   }

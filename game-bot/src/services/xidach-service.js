@@ -1,4 +1,12 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
+} = require("discord.js");
 const { addPlayerXp } = require("../lib/player-progression");
 const { buildProgressBar, emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
@@ -37,6 +45,7 @@ const WIN_XP_GAIN = 4;
 const BET_XP_GAIN = 1;
 
 const ACTION_PREFIX = "xidach:action:";
+const MODAL_PREFIX = "xidach:modal:";
 const QUICK_BET_VALUES = [1000, 5000, 10000, 25000, 50000, 100000];
 
 const SUITS = ["♠", "♥", "♦", "♣"];
@@ -155,7 +164,11 @@ function buildLobbyComponents(channelId) {
           .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
           .setLabel(`🪙 ${formatNumber(amount)}`)
           .setStyle(ButtonStyle.Secondary)
-      )
+      ),
+      new ButtonBuilder()
+        .setCustomId(`${ACTION_PREFIX}${channelId}:custom`)
+        .setLabel("✍️ Nhập cược")
+        .setStyle(ButtonStyle.Success)
     )
   ];
 }
@@ -170,10 +183,27 @@ function buildLobbyEmbed(channelId) {
         "Chọn nhanh một mức cược bên dưới để vào ván.",
         `Cược tối thiểu: **${formatXu(MIN_BET)}**`,
         `Cược tối đa: **${formatXu(MAX_BET)}**`,
+        "Có thể bấm **Nhập cược** để điền số tiền bất kỳ.",
         "Bạn cũng có thể gõ tay như `!play 1000`."
       ].join("\n")
     )
     .setFooter({ text: "Sau khi vào ván, bấm Rút hoặc Dừng để chơi." });
+}
+
+function buildBetModal(channelId) {
+  return new ModalBuilder()
+    .setCustomId(`${MODAL_PREFIX}${channelId}`)
+    .setTitle("Nhập mức cược Xì Dách")
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("amount")
+          .setLabel(`Nhập số Xu (${MIN_BET} - ${MAX_BET})`)
+          .setPlaceholder("Ví dụ: 12000")
+          .setRequired(true)
+          .setStyle(TextInputStyle.Short)
+      )
+    );
 }
 
 function buildStatusEmbed(session, note = "Đến lượt người chơi quyết định.") {
@@ -560,6 +590,21 @@ function parseActionCustomId(customId) {
   return channelId && action ? { channelId, action, value } : null;
 }
 
+function parseModalCustomId(customId) {
+  if (!customId?.startsWith(MODAL_PREFIX)) {
+    return null;
+  }
+  const channelId = customId.slice(MODAL_PREFIX.length);
+  return channelId ? { channelId } : null;
+}
+
+async function sendStartedRound(interaction, nextSession, betAmount) {
+  await interaction.channel.send({
+    embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`)],
+    components: buildActionComponents(nextSession)
+  });
+}
+
 async function handleButtonInteraction(interaction) {
   const parsed = parseActionCustomId(interaction.customId);
   if (!parsed) {
@@ -567,8 +612,14 @@ async function handleButtonInteraction(interaction) {
   }
 
   const session = sessions.get(parsed.channelId);
+  if (!session && parsed.action === "custom") {
+    await interaction.showModal(buildBetModal(parsed.channelId));
+    return true;
+  }
+
   if (!session && parsed.action === "start") {
     try {
+      await interaction.deferReply({ ephemeral: true });
       const betAmount = Number(parsed.value);
       const nextSession = await startRound({
         guildId: interaction.guildId,
@@ -579,13 +630,15 @@ async function handleButtonInteraction(interaction) {
         betAmount
       });
 
-      await interaction.reply({
-        embeds: [buildStatusEmbed(nextSession, `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`)],
-        components: buildActionComponents(nextSession)
-      });
+      await sendStartedRound(interaction, nextSession, betAmount);
+      await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
       return true;
     } catch (error) {
-      await interaction.reply({ content: error.message, ephemeral: true });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: error.message });
+      } else {
+        await interaction.reply({ content: error.message, ephemeral: true });
+      }
       return true;
     }
   }
@@ -606,27 +659,58 @@ async function handleButtonInteraction(interaction) {
   }
 
   if (parsed.action === "hit") {
+    await interaction.deferReply({ ephemeral: true });
     session.playerCards.push(drawCard(session.deck));
     const playerScore = getHandScore(session.playerCards);
     if (playerScore > 21) {
-      await interaction.deferReply();
       await settleSession(interaction.channel, session);
-      await interaction.deleteReply().catch(() => {});
+      await interaction.editReply("Bạn đã quắc. Bot đã chốt ván và gửi kết quả trong phòng.");
       return true;
     }
 
-    await interaction.reply({ embeds: [buildStatusEmbed(session, `Bạn vừa rút thêm bài. Điểm hiện tại: ${playerScore}.`)], ephemeral: true });
+    await interaction.editReply({ embeds: [buildStatusEmbed(session, `Bạn vừa rút thêm bài. Điểm hiện tại: ${playerScore}.`)] });
     return true;
   }
 
   if (parsed.action === "stand") {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
     await settleSession(interaction.channel, session);
-    await interaction.deleteReply().catch(() => {});
+    await interaction.editReply("Đã dừng rút bài và chốt ván. Kết quả đã gửi vào phòng.");
     return true;
   }
 
   return false;
+}
+
+async function handleModalInteraction(interaction) {
+  const parsed = parseModalCustomId(interaction.customId);
+  if (!parsed) {
+    return false;
+  }
+
+  try {
+    await interaction.deferReply({ ephemeral: true });
+    const betAmount = Number(interaction.fields.getTextInputValue("amount"));
+    const nextSession = await startRound({
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      channelName: interaction.channel?.name || "unknown",
+      userId: interaction.user.id,
+      username: interaction.user.username,
+      betAmount
+    });
+
+    await sendStartedRound(interaction, nextSession, betAmount);
+    await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
+  } catch (error) {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: error.message });
+    } else {
+      await interaction.reply({ content: error.message, ephemeral: true });
+    }
+  }
+
+  return true;
 }
 
 async function handleMessage(message) {
@@ -709,6 +793,7 @@ async function handleMessage(message) {
 module.exports = {
   handleMessage,
   handleButtonInteraction,
+  handleModalInteraction,
   startRound,
   stopSession,
   getSessionStatus,
