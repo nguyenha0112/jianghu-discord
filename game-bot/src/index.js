@@ -222,7 +222,7 @@ client.on(Events.MessageCreate, async (message) => {
     await message.react("❌").catch(() => {});
   }
 
-  if (!finalResult.silent && (finalResult.reply || finalResult.embeds || finalResult.components)) {
+  if (!finalResult.silent && (finalResult.reply || finalResult.embeds || finalResult.components || finalResult.files)) {
     const payload = {};
     if (finalResult.reply) {
       payload.content = finalResult.reply;
@@ -232,6 +232,9 @@ client.on(Events.MessageCreate, async (message) => {
     }
     if (finalResult.components) {
       payload.components = finalResult.components;
+    }
+    if (finalResult.files) {
+      payload.files = finalResult.files;
     }
     await message.reply(payload).catch(() => {});
   }

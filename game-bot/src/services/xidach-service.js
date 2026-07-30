@@ -1,5 +1,6 @@
-﻿const {
+const {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -7,8 +8,10 @@
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
+const path = require("node:path");
 const { addPlayerXp } = require("../lib/player-progression");
-const { buildProgressBar, emojiToTwemojiUrl } = require("../lib/ui-theme");
+const { buildProgressBar } = require("../lib/ui-theme");
+const { buildCurrencyPairAttachment, buildXuAttachment } = require("../lib/currency-assets");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
@@ -29,14 +32,14 @@ const RANKING_KEYWORDS = new Set(["!bxh", "!rank", "!top"]);
 const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
 const PROFILE_KEYWORDS = new Set(["!me", "!toi", "!thongke"]);
 const TEXT_COMMAND_ALIASES = new Map([
-  ["!play", "Mở bảng chọn mức cược"],
-  ["!play 1000", "Vào ván ngay với mức cược cụ thể"],
-  ["!xidach 5000", "Vào ván ngay với alias Xì Dách"],
-  ["!trangthai", "Xem trạng thái ván hiện tại"],
-  ["!stop", "Hủy ván đang chơi và hoàn cược"],
-  ["!bxh", "Xem bảng xếp hạng"],
-  ["!lichsu", "Xem các ván gần đây"],
-  ["!help", "Xem hướng dẫn nhanh"]
+  ["!play", "Mo bang chon muc cuoc"],
+  ["!play 1000", "Vao van ngay voi muc cuoc cu the"],
+  ["!xidach 5000", "Alias mo van Xi Dach"],
+  ["!trangthai", "Xem trang thai van hien tai"],
+  ["!stop", "Huy van dang choi va hoan cuoc"],
+  ["!bxh", "Xem bang xep hang"],
+  ["!lichsu", "Xem cac van gan day"],
+  ["!help", "Xem huong dan nhanh"]
 ]);
 
 const MIN_BET = 20;
@@ -48,8 +51,15 @@ const ACTION_PREFIX = "xidach:action:";
 const MODAL_PREFIX = "xidach:modal:";
 const QUICK_BET_VALUES = [40, 100, 200, 400, 1000];
 
-const SUITS = ["â™ ", "â™¥", "â™¦", "â™£"];
+const SUITS = ["♠", "♥", "♦", "♣"];
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const suitAssetCodes = {
+  "♠": "S",
+  "♥": "H",
+  "♦": "D",
+  "♣": "C"
+};
+const cardAssetDir = path.join(__dirname, "..", "..", "assets", "cards");
 
 function normalizeText(input) {
   return (input || "").trim().toLowerCase();
@@ -60,7 +70,7 @@ function formatNumber(value) {
 }
 
 function formatXu(value) {
-  return `🪙 ${formatNumber(value)} Xu`;
+  return `Xu ${formatNumber(value)}`;
 }
 
 function buildDeck() {
@@ -105,62 +115,44 @@ function isNguLinh(cards) {
   return cards.length === 5 && getHandScore(cards) <= 21;
 }
 
-function getSuitColor(suit) {
-  return suit === "♥" || suit === "♦" ? "🟥" : "⬛";
+function cardLabel(card) {
+  return `${card.rank}${card.suit}`;
 }
 
-function padCardRank(rank) {
-  return String(rank).padEnd(2, " ");
+function formatCardList(cards) {
+  if (!cards?.length) {
+    return "Chua co bai";
+  }
+  return cards.map(cardLabel).join(" • ");
 }
 
-function buildCardAscii(card, hidden = false) {
-  if (hidden) {
-    return ["â”Œâ”€â”€â”€â”€â”€â”", "â”‚â–‘â–‘â–‘â–‘â–‘â”‚", "â”‚â–‘â–‘â–‘â–‘â–‘â”‚", "â”‚â–‘â–‘â–‘â–‘â–‘â”‚", "â””â”€â”€â”€â”€â”€â”˜"];
-  }
-
-  const rank = padCardRank(card.rank);
-  const suit = card.suit;
-  return [`â”Œâ”€â”€â”€â”€â”€â”`, `â”‚${rank}   â”‚`, `â”‚  ${suit}  â”‚`, `â”‚   ${rank.trim().padStart(2, " ")}â”‚`, `â””â”€â”€â”€â”€â”€â”˜`];
+function getCardAssetFileName(card) {
+  const suitCode = suitAssetCodes[card.suit] || "S";
+  return `${card.rank}${suitCode}.png`;
 }
 
-function mergeCardAscii(cards, options = {}) {
-  const includeHiddenDealerCard = options.includeHiddenDealerCard || false;
-  const asciiCards = cards.map((card) => buildCardAscii(card));
-
-  if (includeHiddenDealerCard) {
-    asciiCards.push(buildCardAscii(null, true));
-  }
-
-  if (asciiCards.length === 0) {
-    return "`Chưa có bài`";
-  }
-
-  const lines = [];
-  for (let index = 0; index < asciiCards[0].length; index += 1) {
-    lines.push(asciiCards.map((cardLines) => cardLines[index]).join(" "));
-  }
-
-  const suitLegend = asciiCards
-    .map((_, idx) => {
-      if (includeHiddenDealerCard && idx === asciiCards.length - 1) {
-        return "🂠";
-      }
-      return getSuitColor(cards[idx]?.suit || "♠");
-    })
-    .join(" ");
-
-  return ["```text", ...lines, "```", suitLegend].join("\n");
+function buildCardAttachment(fileName, attachmentName) {
+  return new AttachmentBuilder(path.join(cardAssetDir, fileName), { name: attachmentName });
 }
 
-function formatCards(cards) {
-  return mergeCardAscii(cards);
-}
+function buildVisualAttachments(session, options = {}) {
+  const revealDealer = options.revealDealer || false;
+  const files = [buildXuAttachment("xu.png")];
 
-function formatDealerPreview(cards) {
-  if (!cards.length) {
-    return "`Chưa có bài`";
-  }
-  return mergeCardAscii([cards[0]], { includeHiddenDealerCard: true });
+  session.playerCards.forEach((card, index) => {
+    files.push(buildCardAttachment(getCardAssetFileName(card), `player-${index + 1}-${getCardAssetFileName(card)}`));
+  });
+
+  session.dealerCards.forEach((card, index) => {
+    const isHiddenCard = !revealDealer && index > 0;
+    const sourceFileName = isHiddenCard ? "BACK.png" : getCardAssetFileName(card);
+    const attachmentName = isHiddenCard
+      ? `dealer-${index + 1}-BACK.png`
+      : `dealer-${index + 1}-${getCardAssetFileName(card)}`;
+    files.push(buildCardAttachment(sourceFileName, attachmentName));
+  });
+
+  return files;
 }
 
 function createSession({ guildId, channelId, channelName, hostUserId, hostUsername, betAmount }) {
@@ -193,15 +185,15 @@ function buildActionComponents(session) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:hit`)
-        .setLabel("🃏 Rút")
+        .setLabel("Rut")
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:stand`)
-        .setLabel("✋ Dừng")
+        .setLabel("Dung")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:status`)
-        .setLabel("📜 Xem lượt")
+        .setLabel("Xem luot")
         .setStyle(ButtonStyle.Secondary)
     )
   ];
@@ -213,7 +205,7 @@ function buildLobbyComponents(channelId) {
       ...QUICK_BET_VALUES.slice(0, 3).map((amount) =>
         new ButtonBuilder()
           .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
-          .setLabel(`🪙 ${formatNumber(amount)}`)
+          .setLabel(`${formatNumber(amount)} Xu`)
           .setStyle(ButtonStyle.Primary)
       )
     ),
@@ -221,69 +213,71 @@ function buildLobbyComponents(channelId) {
       ...QUICK_BET_VALUES.slice(3).map((amount) =>
         new ButtonBuilder()
           .setCustomId(`${ACTION_PREFIX}${channelId}:start:${amount}`)
-          .setLabel(`🪙 ${formatNumber(amount)}`)
+          .setLabel(`${formatNumber(amount)} Xu`)
           .setStyle(ButtonStyle.Secondary)
       ),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${channelId}:custom`)
-        .setLabel("✍️ Nhập cược")
+        .setLabel("Nhap cuoc")
         .setStyle(ButtonStyle.Success)
     )
   ];
 }
 
-function buildLobbyEmbed(channelId) {
+function buildLobbyEmbed() {
   return new EmbedBuilder()
     .setColor(0x8e44ad)
-    .setTitle("🃏 Mở Ván Xì Dách")
-    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setTitle("Mo van Xi Dach")
+    .setThumbnail("attachment://xu.png")
     .setDescription(
       [
-        "Chọn nhanh một mức cược bên dưới để vào ván.",
-        `Cược tối thiểu: **${formatXu(MIN_BET)}**`,
-        `Cược tối đa: **${formatXu(MAX_BET)}**`,
-        "Có thể bấm **Nhập cược** để điền số tiền bất kỳ.",
-        "Bạn cũng có thể gõ tay như `!play 1000`."
+        "Chon nhanh mot muc cuoc ben duoi de vao van.",
+        `Cuoc toi thieu: **${formatXu(MIN_BET)}**`,
+        `Cuoc toi da: **${formatXu(MAX_BET)}**`,
+        "Ban cung co the bam **Nhap cuoc** de dien so tien bat ky.",
+        "Hoac go tay: `!play 1000`."
       ].join("\n")
     )
-    .setFooter({ text: "Sau khi vào ván, bấm Rút hoặc Dừng để chơi." });
+    .setFooter({ text: "Sau khi vao van, bam Rut hoac Dung de choi." });
 }
 
 function buildBetModal(channelId) {
   return new ModalBuilder()
     .setCustomId(`${MODAL_PREFIX}${channelId}`)
-    .setTitle("Nhập mức cược Xì Dách")
+    .setTitle("Nhap muc cuoc Xi Dach")
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId("amount")
-          .setLabel(`Nhập số Xu (${MIN_BET} - ${MAX_BET})`)
-          .setPlaceholder("Ví dụ: 12000")
+          .setLabel(`Nhap so Xu (${MIN_BET} - ${MAX_BET})`)
+          .setPlaceholder("Vi du: 12000")
           .setRequired(true)
           .setStyle(TextInputStyle.Short)
       )
     );
 }
 
-function buildStatusEmbed(session, note = "Đến lượt người chơi quyết định.") {
+function buildStatusEmbed(session, note = "Den luot nguoi choi quyet dinh.") {
   const playerScore = getHandScore(session.playerCards);
-  const dealerVisible = formatDealerPreview(session.dealerCards);
+  const dealerOpenCards = session.dealerCards.length > 0 ? `${cardLabel(session.dealerCards[0])} • Bai up` : "Chua co bai";
 
   return new EmbedBuilder()
     .setColor(0x9b59b6)
-    .setTitle("🃏 Xì Dách Jianghu")
-    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setTitle("Xi Dach Jianghu")
+    .setThumbnail("attachment://xu.png")
     .setDescription(
       [
-        `**Người chơi:** <@${session.hostUserId}>`,
-        `**Cược:** ${formatXu(session.betAmount)}`,
-        `**Điểm bạn:** ${playerScore}`,
-        `**Bài bạn:** ${formatCards(session.playerCards)}`,
-        `**Bài nhà cái:** ${dealerVisible}`
+        `**Nguoi choi:** <@${session.hostUserId}>`,
+        `**Cuoc:** ${formatXu(session.betAmount)}`,
+        `**Diem ban:** ${playerScore}`,
+        `**Bai ban:** ${formatCardList(session.playerCards)}`,
+        `**Bai nha cai:** ${dealerOpenCards}`,
+        "",
+        "Anh la bai duoc dinh kem ngay ben duoi tin nhan."
       ].join("\n")
     )
-    .addFields({ name: "📢 Thông báo", value: note, inline: false })
-    .setFooter({ text: "Bấm Rút để bốc thêm bài, bấm Dừng để chốt điểm với nhà cái." });
+    .addFields({ name: "Thong bao", value: note, inline: false })
+    .setFooter({ text: "Thu tu anh: bai nguoi choi truoc, bai nha cai sau." });
 }
 
 function buildSettlementEmbed(session, resultText) {
@@ -292,25 +286,24 @@ function buildSettlementEmbed(session, resultText) {
 
   return new EmbedBuilder()
     .setColor(0x8e44ad)
-    .setTitle("🃏 Kết Quả Xì Dách")
-    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setTitle("Ket qua Xi Dach")
+    .setThumbnail("attachment://xu.png")
     .setDescription(
       [
         resultText,
         "",
-        `**Bạn - ${playerScore}**`,
-        formatCards(session.playerCards),
-        "",
-        `**Nhà cái - ${dealerScore}**`,
-        formatCards(session.dealerCards)
+        `**Ban - ${playerScore}:** ${formatCardList(session.playerCards)}`,
+        `**Nha cai - ${dealerScore}:** ${formatCardList(session.dealerCards)}`
       ].join("\n")
-    );
+    )
+    .setFooter({ text: "Anh la bai da duoc dinh kem ben duoi." });
 }
 
 async function sendOrRefreshStatusMessage(channel, session, note) {
   const payload = {
     embeds: [buildStatusEmbed(session, note)],
-    components: buildActionComponents(session)
+    components: buildActionComponents(session),
+    files: buildVisualAttachments(session)
   };
 
   if (!session.statusMessageId) {
@@ -338,51 +331,24 @@ async function closeStatusMessage(channel, session) {
   try {
     const message = await channel.messages.fetch(session.statusMessageId);
     await message.edit({
-      embeds: [buildStatusEmbed(session, "Ván đã kết thúc.")],
-      components: []
+      embeds: [buildStatusEmbed(session, "Van da ket thuc.")],
+      components: [],
+      files: buildVisualAttachments(session)
     });
   } catch {
-    // Bo qua neu khong fetch/edit duoc tin nhan ban choi cu.
+    // Bo qua neu khong edit duoc tin nhan ban cu.
   }
 }
 
 function getHelpText() {
   return [
-    "Luật: nhấn `!play` để mở bảng chọn mức cược, hoặc `!play 1000` để vào ván luôn.",
-    "Sau đó bấm `Rút` để lấy thêm bài hoặc `Dừng` để so điểm với nhà cái.",
-    "A có thể tính là 1 hoặc 11. Quá 21 là quắc ngay.",
-    "Nhấn `!stop` hoặc `!out` để thoát ván đang treo.",
-    "Nhấn `!bxh` để xem bảng xếp hạng, `!lichsu` để xem các ván gần đây."
-  ].join("\n");
-}
-
-function getRankingText() {
-  const ranking = getXiDachRanking(10);
-  if (ranking.length === 0) {
-    return "Xì Dách chưa có dữ liệu xếp hạng.";
-  }
-
-  return [
-    "**🏆 Bảng xếp hạng Xì Dách**",
-    ...ranking.map(
-      (entry, index) =>
-        `${index + 1}. <@${entry.userId}> - Thắng: ${entry.wins}, Hòa: ${entry.pushes}, Lãi: ${formatXu(entry.profitXu)}, Ván: ${entry.games}, Ăn đậm nhất: ${formatXu(entry.bestWinXu)}`
-    )
-  ].join("\n");
-}
-
-function getHistoryText() {
-  const history = getXiDachHistory(8);
-  if (history.length === 0) {
-    return "Xì Dách chưa có lịch sử ván nào.";
-  }
-
-  return [
-    "**🧾 Lịch sử Xì Dách gần đây**",
-    ...history.map(
-      (entry, index) =>
-        `${index + 1}. <@${entry.userId}> | Kết quả: ${entry.resultLabel} | Cược: ${formatXu(entry.betAmount)} | Lãi: ${formatXu(entry.netXu)} | Điểm: ${entry.playerScore}-${entry.dealerScore}`
-    )
+    "Luat: nhan `!play` de mo bang chon muc cuoc, hoac `!play 1000` de vao van luon.",
+    "Sau do bam `Rut` de lay them bai hoac `Dung` de so diem voi nha cai.",
+    "A co the tinh la 1 hoac 11. Qua 21 la quac ngay.",
+    "Nha cai rut toi thieu den 17 diem, toi da 5 la.",
+    "Nhieu nhat 5 la ma khong qua 21 la ngu linh.",
+    "Nhan `!stop` hoac `!out` de thoat van dang treo.",
+    "Nhan `!bxh` de xem bang xep hang, `!lichsu` de xem cac van gan day."
   ].join("\n");
 }
 
@@ -390,36 +356,34 @@ function buildRankingEmbed() {
   const ranking = getXiDachRanking(10);
   return new EmbedBuilder()
     .setColor(0xf1c40f)
-    .setTitle("🏆 Bảng Xếp Hạng Xì Dách")
-    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setTitle("Bang xep hang Xi Dach")
     .setDescription(
       ranking.length > 0
         ? ranking
             .map(
               (entry, index) =>
-                `**${index + 1}.** <@${entry.userId}>\nThắng: **${entry.wins}** | Hòa: **${entry.pushes}** | Lãi: **${formatXu(entry.profitXu)}** | Ván: **${entry.games}**`
+                `**${index + 1}.** <@${entry.userId}>\nThang: **${entry.wins}** | Hoa: **${entry.pushes}** | Lai: **${formatXu(entry.profitXu)}** | Van: **${entry.games}**`
             )
             .join("\n\n")
-        : "Xì Dách chưa có dữ liệu xếp hạng."
+        : "Xi Dach chua co du lieu xep hang."
     )
-    .setFooter({ text: "Dùng !me để xem thống kê cá nhân." });
+    .setFooter({ text: "Dung !me de xem thong ke ca nhan." });
 }
 
 function buildHistoryEmbed() {
   const history = getXiDachHistory(8);
   return new EmbedBuilder()
     .setColor(0x3498db)
-    .setTitle("🧾 Lịch Sử Xì Dách Gần Đây")
-    .setThumbnail(emojiToTwemojiUrl("🧾"))
+    .setTitle("Lich su Xi Dach gan day")
     .setDescription(
       history.length > 0
         ? history
             .map(
               (entry, index) =>
-                `**${index + 1}.** <@${entry.userId}>\nKết quả: **${entry.resultLabel}** | Cược: **${formatXu(entry.betAmount)}**\nLãi: **${formatXu(entry.netXu)}** | Điểm: **${entry.playerScore}-${entry.dealerScore}**`
+                `**${index + 1}.** <@${entry.userId}>\nKet qua: **${entry.resultLabel}** | Cuoc: **${formatXu(entry.betAmount)}**\nLai: **${formatXu(entry.netXu)}** | Diem: **${entry.playerScore}-${entry.dealerScore}**`
             )
             .join("\n\n")
-        : "Xì Dách chưa có lịch sử ván nào."
+        : "Xi Dach chua co lich su van nao."
     );
 }
 
@@ -433,28 +397,28 @@ function buildProfileEmbed(player, username, rankingEntry) {
 
   return new EmbedBuilder()
     .setColor(0x9b59b6)
-    .setTitle("🃏 Hồ Sơ Xì Dách")
-    .setThumbnail(emojiToTwemojiUrl("🃏"))
+    .setTitle("Ho so Xi Dach")
+    .setThumbnail("attachment://currencies.png")
     .setDescription(`<@${player.userId}> - **${username}**`)
     .addFields(
       {
-        name: "🪙 Ví hiện tại",
-        value: `Xu: **${formatXu(player.wallet.xu)}**\nNgọc: **${formatNumber(player.wallet.ngoc)}**`,
+        name: "Vi hien tai",
+        value: `Xu: **${formatXu(player.wallet.xu)}**\nNgoc: **${formatNumber(player.wallet.ngoc)}**`,
         inline: true
       },
       {
-        name: "🎮 Thành tích Xì Dách",
-        value: `Ván: **${totalGames}**\nThắng: **${wins}**\nHòa: **${pushes}**\nTỉ lệ thắng: **${winRate}%**`,
+        name: "Thanh tich Xi Dach",
+        value: `Van: **${totalGames}**\nThang: **${wins}**\nHoa: **${pushes}**\nTi le thang: **${winRate}%**`,
         inline: true
       },
       {
-        name: "📈 Hiệu suất",
-        value: `Lãi ròng: **${formatXu(profitXu)}**\nĂn đậm nhất: **${formatXu(bestWinXu)}**`,
+        name: "Hieu suat",
+        value: `Lai rong: **${formatXu(profitXu)}**\nAn dam nhat: **${formatXu(bestWinXu)}**`,
         inline: false
       },
       {
-        name: "✨ Tu vi tổng",
-        value: `Cấp: **${player.stats.playerLevel}**\nXP: **${player.stats.playerXp}/100**\n${buildProgressBar(player.stats.playerXp, 100, 12)}`,
+        name: "Tu vi tong",
+        value: `Cap: **${player.stats.playerLevel}**\nXP: **${player.stats.playerXp}/100**\n${buildProgressBar(player.stats.playerXp, 100, 12)}`,
         inline: false
       }
     );
@@ -462,10 +426,10 @@ function buildProfileEmbed(player, username, rankingEntry) {
 
 function buildRoomGuideText() {
   return [
-    "**Phòng Xì Dách đã sẵn sàng.**",
-    "Nhấn `!play` để mở bảng chọn mức cược, hoặc `!play 1000` để vào thẳng ván.",
-    "Bấm `Rút` hoặc `Dừng` để chơi.",
-    "`!trangthai` để xem lại bàn hiện tại, `!stop` để hủy ván."
+    "**Phong Xi Dach da san sang.**",
+    "Nhan `!play` de mo bang chon muc cuoc, hoac `!play 1000` de vao thang van.",
+    "Bam `Rut` hoac `Dung` de choi.",
+    "`!trangthai` de xem lai ban hien tai, `!stop` de huy van."
   ].join("\n");
 }
 
@@ -475,7 +439,7 @@ function isTextCommand(raw) {
 
 function getAvailableTextCommandMessage() {
   return [
-    "Lệnh chưa đúng. Bạn có thể dùng:",
+    "Lenh chua dung. Ban co the dung:",
     ...[...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`)
   ].join("\n");
 }
@@ -491,7 +455,8 @@ async function getProfilePayload(userId, username) {
   return {
     ok: true,
     skipReaction: true,
-    embeds: [buildProfileEmbed(player, username, rankingEntry)]
+    embeds: [buildProfileEmbed(player, username, rankingEntry)],
+    files: [buildCurrencyPairAttachment()]
   };
 }
 
@@ -532,20 +497,20 @@ async function adjustPlayerXu(userId, username, amount, type, extra = {}) {
 
 async function startRound({ guildId, channelId, channelName, userId, username, betAmount }) {
   if (!isEnabledRoom(channelId)) {
-    throw new Error("Phòng này chưa được bật cho Xì Dách. Hãy dùng `/xidach-tao-phong` trước.");
+    throw new Error("Phong nay chua duoc bat cho Xi Dach. Hay dung `/xidach-tao-phong` truoc.");
   }
 
   if (sessions.has(channelId)) {
-    throw new Error("Phòng này đang có một ván Xì Dách rồi. Hãy chơi xong hoặc `!stop` trước.");
+    throw new Error("Phong nay dang co mot van Xi Dach roi. Hay choi xong hoac `!stop` truoc.");
   }
 
   if (!Number.isInteger(betAmount) || betAmount < MIN_BET || betAmount > MAX_BET) {
-    throw new Error(`Cược phải từ ${formatNumber(MIN_BET)} đến ${formatNumber(MAX_BET)} Xu.`);
+    throw new Error(`Cuoc phai tu ${formatNumber(MIN_BET)} den ${formatNumber(MAX_BET)} Xu.`);
   }
 
   const player = await ensureWalletPlayer(userId, username);
   if (player.wallet.xu < betAmount) {
-    throw new Error(`Bạn không đủ Xu để cược. Số dư hiện tại: ${formatXu(player.wallet.xu)}.`);
+    throw new Error(`Ban khong du Xu de cuoc. So du hien tai: ${formatXu(player.wallet.xu)}.`);
   }
 
   await adjustPlayerXu(userId, username, -betAmount, "xidach_bet", { xpGain: BET_XP_GAIN });
@@ -576,7 +541,7 @@ async function refundSession(session) {
     return null;
   }
   const updated = await adjustPlayerXu(session.hostUserId, session.hostUsername, session.betAmount, "xidach_refund");
-  return `Đã hoàn ${formatXu(session.betAmount)} cho <@${session.hostUserId}>. Số dư hiện tại: ${formatXu(updated.wallet.xu)}.`;
+  return `Da hoan ${formatXu(session.betAmount)} cho <@${session.hostUserId}>. So du hien tai: ${formatXu(updated.wallet.xu)}.`;
 }
 
 async function settleSession(channel, session) {
@@ -598,18 +563,14 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Cả hai đều đạt ngũ linh nên ván này hòa. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
-    updateXiDachRanking(session.hostUserId, session.hostUsername, {
-      pushes: 1,
-      games: 1,
-      profitXu: 0
-    });
+    resultText = `Ca hai deu dat ngu linh nen van nay hoa. Ban duoc hoan ${formatXu(session.betAmount)}. So du: ${formatXu(updated.wallet.xu)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, { pushes: 1, games: 1, profitXu: 0 });
     addXiDachHistoryEntry({
       guildId: session.guildId,
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Hòa ngũ linh",
+      resultLabel: "Hoa ngu linh",
       betAmount: session.betAmount,
       netXu: 0,
       playerScore,
@@ -623,7 +584,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Bạn đạt ngũ linh và thắng ${formatXu(payout)}. Lãi ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Ban dat ngu linh va thang ${formatXu(payout)}. Lai ${formatXu(session.betAmount)}. So du: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       wins: 1,
       games: 1,
@@ -635,24 +596,21 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Thắng ngũ linh",
+      resultLabel: "Thang ngu linh",
       betAmount: session.betAmount,
       netXu: session.betAmount,
       playerScore,
       dealerScore
     });
   } else if (dealerNguLinh) {
-    resultText = `Nhà cái đạt ngũ linh. Bạn thua ${formatXu(session.betAmount)}.`;
-    updateXiDachRanking(session.hostUserId, session.hostUsername, {
-      games: 1,
-      profitXu: -session.betAmount
-    });
+    resultText = `Nha cai dat ngu linh. Ban thua ${formatXu(session.betAmount)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, { games: 1, profitXu: -session.betAmount });
     addXiDachHistoryEntry({
       guildId: session.guildId,
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Thua nhà cái ngũ linh",
+      resultLabel: "Thua nha cai ngu linh",
       betAmount: session.betAmount,
       netXu: -session.betAmount,
       playerScore,
@@ -664,35 +622,28 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Cả hai cùng vượt 21 điểm nên ván này hòa. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
-    updateXiDachRanking(session.hostUserId, session.hostUsername, {
-      pushes: 1,
-      games: 1,
-      profitXu: 0
-    });
+    resultText = `Ca hai cung vuot 21 diem nen van nay hoa. Ban duoc hoan ${formatXu(session.betAmount)}. So du: ${formatXu(updated.wallet.xu)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, { pushes: 1, games: 1, profitXu: 0 });
     addXiDachHistoryEntry({
       guildId: session.guildId,
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Hòa cùng quắc",
+      resultLabel: "Hoa cung quac",
       betAmount: session.betAmount,
       netXu: 0,
       playerScore,
       dealerScore
     });
   } else if (playerScore > 21) {
-    resultText = `Bạn đã vượt quá 21 điểm. Bạn thua ${formatXu(session.betAmount)}.`;
-    updateXiDachRanking(session.hostUserId, session.hostUsername, {
-      games: 1,
-      profitXu: -session.betAmount
-    });
+    resultText = `Ban da vuot qua 21 diem. Ban thua ${formatXu(session.betAmount)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, { games: 1, profitXu: -session.betAmount });
     addXiDachHistoryEntry({
       guildId: session.guildId,
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Thua quắc",
+      resultLabel: "Thua quac",
       betAmount: session.betAmount,
       netXu: -session.betAmount,
       playerScore,
@@ -706,7 +657,7 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Bạn thắng và nhận ${formatXu(payout)}. Lãi ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
+    resultText = `Ban thang va nhan ${formatXu(payout)}. Lai ${formatXu(session.betAmount)}. So du: ${formatXu(updated.wallet.xu)}.`;
     updateXiDachRanking(session.hostUserId, session.hostUsername, {
       wins: 1,
       games: 1,
@@ -718,7 +669,7 @@ async function settleSession(channel, session) {
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Thắng",
+      resultLabel: "Thang",
       betAmount: session.betAmount,
       netXu: session.betAmount,
       playerScore,
@@ -730,29 +681,22 @@ async function settleSession(channel, session) {
       dealerScore,
       playerScore
     });
-    resultText = `Hai bên hòa điểm. Bạn được hoàn ${formatXu(session.betAmount)}. Số dư: ${formatXu(updated.wallet.xu)}.`;
-    updateXiDachRanking(session.hostUserId, session.hostUsername, {
-      pushes: 1,
-      games: 1,
-      profitXu: 0
-    });
+    resultText = `Hai ben hoa diem. Ban duoc hoan ${formatXu(session.betAmount)}. So du: ${formatXu(updated.wallet.xu)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, { pushes: 1, games: 1, profitXu: 0 });
     addXiDachHistoryEntry({
       guildId: session.guildId,
       channelId: session.channelId,
       userId: session.hostUserId,
       username: session.hostUsername,
-      resultLabel: "Hòa",
+      resultLabel: "Hoa",
       betAmount: session.betAmount,
       netXu: 0,
       playerScore,
       dealerScore
     });
   } else {
-    resultText = `Nhà cái cao điểm hơn. Bạn thua ${formatXu(session.betAmount)}.`;
-    updateXiDachRanking(session.hostUserId, session.hostUsername, {
-      games: 1,
-      profitXu: -session.betAmount
-    });
+    resultText = `Nha cai cao diem hon. Ban thua ${formatXu(session.betAmount)}.`;
+    updateXiDachRanking(session.hostUserId, session.hostUsername, { games: 1, profitXu: -session.betAmount });
     addXiDachHistoryEntry({
       guildId: session.guildId,
       channelId: session.channelId,
@@ -768,7 +712,10 @@ async function settleSession(channel, session) {
 
   sessions.delete(session.channelId);
   await closeStatusMessage(channel, session);
-  await channel.send({ embeds: [buildSettlementEmbed(session, resultText)] }).catch(() => {});
+  await channel.send({
+    embeds: [buildSettlementEmbed(session, resultText)],
+    files: buildVisualAttachments(session, { revealDealer: true })
+  }).catch(() => {});
 }
 
 function parseActionCustomId(customId) {
@@ -792,7 +739,7 @@ async function sendStartedRound(channel, nextSession, betAmount) {
   await sendOrRefreshStatusMessage(
     channel,
     nextSession,
-    `Ván mới đã bắt đầu với mức cược ${formatXu(betAmount)}. Bấm **Rút** hoặc **Dừng** để chơi.`
+    `Van moi da bat dau voi muc cuoc ${formatXu(betAmount)}. Bam **Rut** hoac **Dung** de choi.`
   );
 }
 
@@ -822,7 +769,7 @@ async function handleButtonInteraction(interaction) {
       });
 
       await sendStartedRound(interaction.channel, nextSession, betAmount);
-      await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
+      await interaction.editReply(`Da mo van Xi Dach voi muc cuoc ${formatXu(betAmount)}.`);
       return true;
     } catch (error) {
       if (interaction.deferred || interaction.replied) {
@@ -835,18 +782,18 @@ async function handleButtonInteraction(interaction) {
   }
 
   if (!session) {
-    await interaction.reply({ content: "Ván Xì Dách này không còn hoạt động.", ephemeral: true });
+    await interaction.reply({ content: "Van Xi Dach nay khong con hoat dong.", ephemeral: true });
     return true;
   }
 
   if (interaction.user.id !== session.hostUserId) {
-    await interaction.reply({ content: "Chỉ người mở ván mới được bấm nút trong ván này.", ephemeral: true });
+    await interaction.reply({ content: "Chi nguoi mo van moi duoc bam nut trong van nay.", ephemeral: true });
     return true;
   }
 
   if (parsed.action === "status") {
     await interaction.deferUpdate();
-    await sendOrRefreshStatusMessage(interaction.channel, session, "Đây là trạng thái hiện tại của ván.");
+    await sendOrRefreshStatusMessage(interaction.channel, session, "Day la trang thai hien tai cua van.");
     return true;
   }
 
@@ -864,7 +811,7 @@ async function handleButtonInteraction(interaction) {
       return true;
     }
 
-    await sendOrRefreshStatusMessage(interaction.channel, session, `Bạn vừa rút thêm bài. Điểm hiện tại: ${playerScore}.`);
+    await sendOrRefreshStatusMessage(interaction.channel, session, `Ban vua rut them bai. Diem hien tai: ${playerScore}.`);
     return true;
   }
 
@@ -896,7 +843,7 @@ async function handleModalInteraction(interaction) {
     });
 
     await sendStartedRound(interaction.channel, nextSession, betAmount);
-    await interaction.editReply(`Đã mở ván Xì Dách với mức cược ${formatXu(betAmount)}.`);
+    await interaction.editReply(`Da mo van Xi Dach voi muc cuoc ${formatXu(betAmount)}.`);
   } catch (error) {
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply({ content: error.message });
@@ -932,33 +879,47 @@ async function handleMessage(message) {
 
   if (STATUS_KEYWORDS.has(lowered)) {
     if (!session) {
-      return { ok: true, skipReaction: true, reply: "Hiện chưa có ván Xì Dách nào đang chạy." };
+      return { ok: true, skipReaction: true, reply: "Hien chua co van Xi Dach nao dang chay." };
     }
-    return { ok: true, skipReaction: true, reply: "Đây là trạng thái hiện tại của ván.", silent: false };
+    return {
+      ok: true,
+      skipReaction: true,
+      embeds: [buildStatusEmbed(session, "Day la trang thai hien tai cua van.")],
+      files: buildVisualAttachments(session)
+    };
   }
 
   if (STOP_KEYWORDS.has(lowered)) {
     if (!session) {
-      return { ok: true, skipReaction: true, reply: "Hiện chưa có ván Xì Dách nào để hủy." };
+      return { ok: false, reply: "Khong co van Xi Dach nao de huy." };
     }
-    const stoppedSession = stopSession(message.channel.id);
-    const refundText = await refundSession(stoppedSession);
-    return { ok: true, skipReaction: true, reply: refundText };
+    if (message.author.id !== session.hostUserId) {
+      return { ok: false, reply: "Chi nguoi mo van moi co the huy van Xi Dach nay." };
+    }
+    stopSession(message.channel.id);
+    const refundText = await refundSession(session);
+    await closeStatusMessage(message.channel, session);
+    return { ok: true, skipReaction: true, reply: `Da huy van Xi Dach. ${refundText}` };
   }
 
   if (lowered === "!play" || lowered === "!batdau" || lowered === "!xidach") {
+    if (session) {
+      return { ok: false, reply: "Phong nay dang co van Xi Dach roi. Hay choi xong hoac `!stop` truoc." };
+    }
+
     return {
       ok: true,
       skipReaction: true,
-      embeds: [buildLobbyEmbed(message.channel.id)],
-      components: buildLobbyComponents(message.channel.id)
+      embeds: [buildLobbyEmbed()],
+      components: buildLobbyComponents(message.channel.id),
+      files: [buildXuAttachment("xu.png")]
     };
   }
 
-  const startMatch = raw.match(START_RE);
-  if (startMatch) {
+  const match = raw.match(START_RE);
+  if (match) {
     try {
-      const betAmount = Number(startMatch[2]);
+      const betAmount = Number(match[2]);
       const nextSession = await startRound({
         guildId: message.guild.id,
         channelId: message.channel.id,
@@ -969,9 +930,9 @@ async function handleMessage(message) {
       });
 
       await sendStartedRound(message.channel, nextSession, betAmount);
-      return { ok: true, skipReaction: true, silent: true };
+      return { ok: true, skipReaction: true, reply: `Da mo van moi o che do Xi Dach. Muc cuoc hien tai la ${formatXu(betAmount)}.` };
     } catch (error) {
-      return { ok: false, skipReaction: true, reply: error.message };
+      return { ok: false, reply: error.message };
     }
   }
 
@@ -983,14 +944,12 @@ async function handleMessage(message) {
 }
 
 module.exports = {
-  handleMessage,
+  buildStatusEmbed,
+  buildVisualAttachments,
+  buildRoomGuideText,
+  getRoomConfig,
+  getSessionStatus,
   handleButtonInteraction,
   handleModalInteraction,
-  startRound,
-  stopSession,
-  getSessionStatus,
-  getRoomConfig,
-  buildRoomGuideText,
-  buildStatusEmbed
+  handleMessage
 };
-

@@ -1,6 +1,7 @@
 const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { getCultivationStatus, getProfile } = require("../services/game-service");
-const { buildProgressBar, getPrimaryVisual, getProfessionTheme, getRealmTheme } = require("../lib/ui-theme");
+const { buildProgressBar, getProfessionTheme, getRealmTheme } = require("../lib/ui-theme");
+const { buildCurrencyPairAttachment } = require("../lib/currency-assets");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,34 +14,34 @@ module.exports = {
     const currentProfessionTheme = getProfessionTheme(currentProfessionId);
     const currentLevel = currentProfessionId ? player.profession.levels[currentProfessionId] || 1 : 0;
     const realmTheme = getRealmTheme(player.cultivation?.realm);
-    const visuals = getPrimaryVisual(currentProfessionId, player.cultivation?.realm);
+    const currencyAttachment = buildCurrencyPairAttachment();
 
     const embed = new EmbedBuilder()
-      .setColor(visuals.color)
-      .setTitle(`${currentProfessionTheme.emoji} ${interaction.user.username} • Hồ Sơ Tu Tiên`)
-      .setThumbnail(visuals.thumbnailUrl)
+      .setColor(realmTheme.color)
+      .setTitle(`Ho so tu tien cua ${interaction.user.username}`)
+      .setThumbnail("attachment://currencies.png")
       .setDescription(
         [
-          `**Cảnh giới:** ${realmTheme.emoji} ${cultivation.currentRealm.name}`,
-          `**Đạo tu chính:** ${currentProfessionTheme.emoji} ${currentProfessionId ? currentProfessionTheme.name : "Chưa chọn"}`,
-          `**Linh căn:** ${cultivation.spiritRoot.emoji} ${cultivation.spiritRoot.name}`,
-          `**Động phủ:** ${cultivation.dwelling.emoji} ${cultivation.dwelling.name}`,
-          `**Tiến độ tu vi:** \`${buildProgressBar(player.stats.playerXp, 100)}\` ${player.stats.playerXp}/100 XP`,
-          `**Tiến độ đạo tu:** \`${buildProgressBar(player.profession.xp, 100)}\` ${player.profession.xp}/100 XP nghề`
+          `**Canh gioi:** ${cultivation.currentRealm.name}`,
+          `**Dao tu chinh:** ${currentProfessionId ? currentProfessionTheme.name : "Chua chon"}`,
+          `**Linh can:** ${cultivation.spiritRoot.name}`,
+          `**Dong phu:** ${cultivation.dwelling.name}`,
+          `**Tien do tu vi:** \`${buildProgressBar(player.stats.playerXp, 100)}\` ${player.stats.playerXp}/100 XP`,
+          `**Tien do dao tu:** \`${buildProgressBar(player.profession.xp, 100)}\` ${player.profession.xp}/100 XP nghe`
         ].join("\n")
       )
       .addFields(
-        { name: "🪙 Tài nguyên", value: `Xu **${player.wallet.xu}**\nNgọc **${player.wallet.ngoc}**`, inline: true },
-        { name: "🌸 Tu vi", value: `Cấp **${player.stats.playerLevel}**\nXP **${player.stats.playerXp}**`, inline: true },
-        { name: "🎒 Hành trang", value: `Loại vật phẩm **${Object.keys(player.inventory).length}**`, inline: true },
-        { name: `${currentProfessionTheme.emoji} Đạo tu`, value: `${currentProfessionId ? currentProfessionTheme.name : "Chưa nhập đạo"}\nCấp **${currentLevel}**`, inline: true },
-        { name: `${realmTheme.emoji} Cảnh giới`, value: `Hiện tại **${cultivation.currentRealm.name}**\nGiới hạn **${cultivation.currentRealm.levelCap}**`, inline: true },
-        { name: "⚔️ Lực chiến", value: `HP **${cultivation.combat.hp}**\nCông **${cultivation.combat.attack}**\nThủ **${cultivation.combat.defense}**`, inline: true },
-        { name: "💥 Chiến lực", value: `Bạo kích **${cultivation.combat.critRate}%**\nLực chiến **${cultivation.combat.power}**`, inline: true },
-        { name: "✨ Mốc tiếp theo", value: cultivation.nextRealm ? `**${cultivation.nextRealm.name}**` : "Đã đạt cảnh giới cao nhất", inline: true }
+        { name: "Tai nguyen", value: `Xu **${player.wallet.xu}**\nNgoc **${player.wallet.ngoc}**`, inline: true },
+        { name: "Tu vi", value: `Cap **${player.stats.playerLevel}**\nXP **${player.stats.playerXp}**`, inline: true },
+        { name: "Hanh trang", value: `Loai vat pham **${Object.keys(player.inventory).length}**`, inline: true },
+        { name: "Dao tu", value: `${currentProfessionId ? currentProfessionTheme.name : "Chua nhap dao"}\nCap **${currentLevel}**`, inline: true },
+        { name: "Canh gioi", value: `Hien tai **${cultivation.currentRealm.name}**\nGioi han **${cultivation.currentRealm.levelCap}**`, inline: true },
+        { name: "Luc chien", value: `HP **${cultivation.combat.hp}**\nCong **${cultivation.combat.attack}**\nThu **${cultivation.combat.defense}**`, inline: true },
+        { name: "Suc manh", value: `Bao kich **${cultivation.combat.critRate}%**\nLuc chien **${cultivation.combat.power}**`, inline: true },
+        { name: "Moc tiep theo", value: cultivation.nextRealm ? `**${cultivation.nextRealm.name}**` : "Da dat canh gioi cao nhat", inline: true }
       )
-      .setFooter({ text: "Dùng /tutien để xem đầy đủ lộ trình cảnh giới, đạo tu và điều kiện đột phá." });
+      .setFooter({ text: "Dung /tutien de xem day du lo trinh canh gioi, dao tu va dieu kien dot pha." });
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], files: [currencyAttachment] });
   }
 };
