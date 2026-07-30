@@ -8,7 +8,9 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
+const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const { addPlayerXp } = require("../lib/player-progression");
 const { buildProgressBar } = require("../lib/ui-theme");
 const { buildCurrencyPairAttachment, buildXuAttachment } = require("../lib/currency-assets");
@@ -50,16 +52,15 @@ const BET_XP_GAIN = 1;
 const ACTION_PREFIX = "xidach:action:";
 const MODAL_PREFIX = "xidach:modal:";
 const QUICK_BET_VALUES = [40, 100, 200, 400, 1000];
-
-const SUITS = ["♠", "♥", "♦", "♣"];
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const suitAssetCodes = {
-  "♠": "S",
-  "♥": "H",
-  "♦": "D",
-  "♣": "C"
-};
-const cardAssetDir = path.join(__dirname, "..", "..", "assets", "cards");
+const SUITS = [
+  { code: "S", symbol: "♠" },
+  { code: "H", symbol: "♥" },
+  { code: "D", symbol: "♦" },
+  { code: "C", symbol: "♣" }
+];
+
+const renderScriptPath = path.join(__dirname, "..", "lib", "render_xidach_board.py");
 
 function normalizeText(input) {
   return (input || "").trim().toLowerCase();
@@ -77,13 +78,15 @@ function buildDeck() {
   const deck = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
-      deck.push({ suit, rank });
+      deck.push({ rank, suitCode: suit.code, suitSymbol: suit.symbol });
     }
   }
+
   for (let index = deck.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
     [deck[index], deck[swapIndex]] = [deck[swapIndex], deck[index]];
   }
+
   return deck;
 }
 
@@ -116,7 +119,17 @@ function isNguLinh(cards) {
 }
 
 function cardLabel(card) {
-  return `${card.rank}${card.suit}`;
+  return `${card.rank}${card.suitSymbol}`;
+}
+
+function cardTextLabel(card) {
+  const suitNames = {
+    S: "bich",
+    H: "co",
+    D: "ro",
+    C: "chuon"
+  };
+  return `${card.rank} ${suitNames[card.suitCode] || "bich"}`;
 }
 
 function formatCardList(cards) {
@@ -126,33 +139,53 @@ function formatCardList(cards) {
   return cards.map(cardLabel).join(" • ");
 }
 
-function getCardAssetFileName(card) {
-  const suitCode = suitAssetCodes[card.suit] || "S";
-  return `${card.rank}${suitCode}.png`;
+function buildBoardPayload(session, options = {}) {
+  const revealDealer = options.revealDealer || false;
+  return {
+    title: revealDealer ? "Ket qua Xi Dach" : "Ban Xi Dach",
+    playerName: session.hostUsername,
+    playerScore: getHandScore(session.playerCards),
+    dealerScoreText: revealDealer ? String(getHandScore(session.dealerCards)) : "?",
+    betText: formatXu(session.betAmount),
+    revealDealer,
+    note: options.note || "Den luot nguoi choi quyet dinh.",
+    playerCardsText: session.playerCards.map(cardTextLabel).join(", "),
+    dealerCardsText: revealDealer
+      ? session.dealerCards.map(cardTextLabel).join(", ")
+      : session.dealerCards.length > 0
+        ? `${cardTextLabel(session.dealerCards[0])}, la up`
+        : "Chua co bai",
+    playerCards: session.playerCards.map((card) => ({
+      rank: card.rank,
+      assetCode: card.suitCode
+    })),
+    dealerCards: session.dealerCards.map((card) => ({
+      rank: card.rank,
+      assetCode: card.suitCode
+    }))
+  };
 }
 
-function buildCardAttachment(fileName, attachmentName) {
-  return new AttachmentBuilder(path.join(cardAssetDir, fileName), { name: attachmentName });
+function buildBoardAttachment(session, options = {}) {
+  const outputPath = path.join(
+    os.tmpdir(),
+    `xidach-board-${session.channelId}-${options.revealDealer ? "reveal" : "live"}.png`
+  );
+
+  const result = spawnSync("python", [renderScriptPath, outputPath], {
+    input: JSON.stringify(buildBoardPayload(session, options)),
+    encoding: "utf8"
+  });
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || "Khong render duoc anh ban Xi Dach.");
+  }
+
+  return new AttachmentBuilder(outputPath, { name: "xidach-board.png" });
 }
 
 function buildVisualAttachments(session, options = {}) {
-  const revealDealer = options.revealDealer || false;
-  const files = [buildXuAttachment("xu.png")];
-
-  session.playerCards.forEach((card, index) => {
-    files.push(buildCardAttachment(getCardAssetFileName(card), `player-${index + 1}-${getCardAssetFileName(card)}`));
-  });
-
-  session.dealerCards.forEach((card, index) => {
-    const isHiddenCard = !revealDealer && index > 0;
-    const sourceFileName = isHiddenCard ? "BACK.png" : getCardAssetFileName(card);
-    const attachmentName = isHiddenCard
-      ? `dealer-${index + 1}-BACK.png`
-      : `dealer-${index + 1}-${getCardAssetFileName(card)}`;
-    files.push(buildCardAttachment(sourceFileName, attachmentName));
-  });
-
-  return files;
+  return [buildBoardAttachment(session, options)];
 }
 
 function createSession({ guildId, channelId, channelName, hostUserId, hostUsername, betAmount }) {
@@ -264,7 +297,6 @@ function buildStatusEmbed(session, note = "Den luot nguoi choi quyet dinh.") {
   return new EmbedBuilder()
     .setColor(0x9b59b6)
     .setTitle("Xi Dach Jianghu")
-    .setThumbnail("attachment://xu.png")
     .setDescription(
       [
         `**Nguoi choi:** <@${session.hostUserId}>`,
@@ -273,11 +305,12 @@ function buildStatusEmbed(session, note = "Den luot nguoi choi quyet dinh.") {
         `**Bai ban:** ${formatCardList(session.playerCards)}`,
         `**Bai nha cai:** ${dealerOpenCards}`,
         "",
-        "Anh la bai duoc dinh kem ngay ben duoi tin nhan."
+        "Ban bai da duoc render thanh mot anh tong hop ben duoi."
       ].join("\n")
     )
     .addFields({ name: "Thong bao", value: note, inline: false })
-    .setFooter({ text: "Thu tu anh: bai nguoi choi truoc, bai nha cai sau." });
+    .setImage("attachment://xidach-board.png")
+    .setFooter({ text: "Ban bai duoc canh lai de de nhin hon tren Discord." });
 }
 
 function buildSettlementEmbed(session, resultText) {
@@ -287,7 +320,6 @@ function buildSettlementEmbed(session, resultText) {
   return new EmbedBuilder()
     .setColor(0x8e44ad)
     .setTitle("Ket qua Xi Dach")
-    .setThumbnail("attachment://xu.png")
     .setDescription(
       [
         resultText,
@@ -296,14 +328,15 @@ function buildSettlementEmbed(session, resultText) {
         `**Nha cai - ${dealerScore}:** ${formatCardList(session.dealerCards)}`
       ].join("\n")
     )
-    .setFooter({ text: "Anh la bai da duoc dinh kem ben duoi." });
+    .setImage("attachment://xidach-board.png")
+    .setFooter({ text: "Ban bai cuoi da duoc render thanh mot khung tong hop." });
 }
 
 async function sendOrRefreshStatusMessage(channel, session, note) {
   const payload = {
     embeds: [buildStatusEmbed(session, note)],
     components: buildActionComponents(session),
-    files: buildVisualAttachments(session)
+    files: buildVisualAttachments(session, { note, revealDealer: false })
   };
 
   if (!session.statusMessageId) {
@@ -333,7 +366,7 @@ async function closeStatusMessage(channel, session) {
     await message.edit({
       embeds: [buildStatusEmbed(session, "Van da ket thuc.")],
       components: [],
-      files: buildVisualAttachments(session)
+      files: buildVisualAttachments(session, { note: "Van da ket thuc.", revealDealer: false })
     });
   } catch {
     // Bo qua neu khong edit duoc tin nhan ban cu.
@@ -714,7 +747,7 @@ async function settleSession(channel, session) {
   await closeStatusMessage(channel, session);
   await channel.send({
     embeds: [buildSettlementEmbed(session, resultText)],
-    files: buildVisualAttachments(session, { revealDealer: true })
+    files: buildVisualAttachments(session, { note: resultText, revealDealer: true })
   }).catch(() => {});
 }
 
@@ -885,7 +918,7 @@ async function handleMessage(message) {
       ok: true,
       skipReaction: true,
       embeds: [buildStatusEmbed(session, "Day la trang thai hien tai cua van.")],
-      files: buildVisualAttachments(session)
+      files: buildVisualAttachments(session, { note: "Day la trang thai hien tai cua van.", revealDealer: false })
     };
   }
 
