@@ -4,7 +4,7 @@ const { buildStatusEmbed, getRoomConfig, getSessionStatus } = require("../servic
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("vuatiengviet-trangthai")
-    .setDescription("Xem trang thai van Vua Tieng Viet hien tai."),
+    .setDescription("Xem trạng thái ván Vua Tiếng Việt hiện tại."),
   async execute(interaction) {
     const roomConfig = getRoomConfig(interaction.channelId);
     if (!roomConfig) {

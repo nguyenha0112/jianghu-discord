@@ -14,6 +14,7 @@ const CUSTOM_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "custom-vie
 const BONUS_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-phrases.txt");
 const BONUS_PUZZLES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-bonus-puzzles.json");
 const ULTRA_PUZZLES_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-ultra-puzzles.json");
+
 const sessions = new Map();
 const recentPuzzleIdsByGuild = new Map();
 
@@ -31,6 +32,29 @@ const WIN_BONUS_XP = 15;
 const MAX_RECENT_PUZZLES = 180;
 const MAX_GLOBAL_RECENT_PUZZLES = 600;
 const HINT_POINT_PENALTY = 1;
+
+function normalizeText(input) {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFC")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function stripDiacritics(input) {
+  return (input || "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/đ/gu, "d")
+    .replace(/Đ/gu, "D")
+    .normalize("NFC");
+}
+
+function hasVietnameseDiacritics(input) {
+  const normalized = normalizeText(input);
+  return normalized.length > 0 && stripDiacritics(normalized) !== normalized;
+}
 
 function inferDifficultyFromAnswer(answer) {
   const normalized = normalizeText(answer);
@@ -52,6 +76,10 @@ function isAcceptableGeneratedPhrase(answer) {
     return false;
   }
 
+  if (!hasVietnameseDiacritics(answer)) {
+    return false;
+  }
+
   if (normalized.length < 4 || normalized.length > 24) {
     return false;
   }
@@ -70,11 +98,6 @@ function isAcceptableGeneratedPhrase(answer) {
   }
 
   if (tokens.every((token) => token.length <= 2)) {
-    return false;
-  }
-
-  const bannedFragments = ["a di", "a priori", "a posteriori", "mrơn", "rooi", "nguỵ", "pa tít", "đào khản"];
-  if (bannedFragments.some((fragment) => normalized.includes(fragment))) {
     return false;
   }
 
@@ -112,6 +135,39 @@ function loadGeneratedPhrasePuzzles(filePath, sourceLabel) {
     .map((line, index) => buildGeneratedPuzzle(line, index + 1, sourceLabel));
 }
 
+function normalizePuzzleShape(puzzle) {
+  return {
+    ...puzzle,
+    id: String(puzzle.id || ""),
+    answer: String(puzzle.answer || "").normalize("NFC").trim(),
+    type: puzzle.type || "word",
+    difficulty: puzzle.difficulty || inferDifficultyFromAnswer(puzzle.answer || ""),
+    hint: String(puzzle.hint || "").normalize("NFC").trim(),
+    meaning: String(puzzle.meaning || "").normalize("NFC").trim()
+  };
+}
+
+function isDisplayQualityPuzzle(puzzle) {
+  const answer = String(puzzle.answer || "").trim();
+  if (!answer) {
+    return false;
+  }
+
+  const normalized = normalizeText(answer);
+  const tokens = normalized.split(" ").filter(Boolean);
+  const charCount = [...normalized.replace(/\s+/gu, "")].length;
+
+  if (tokens.length < 2 || charCount < 4) {
+    return false;
+  }
+
+  if (!hasVietnameseDiacritics(answer)) {
+    return false;
+  }
+
+  return true;
+}
+
 function dedupePuzzles(items) {
   const seen = new Set();
   return items.filter((item) => {
@@ -142,30 +198,26 @@ function loadPuzzleBank() {
     ...loadCuratedPuzzles(DATA_PATH),
     ...loadCuratedPuzzles(BONUS_PUZZLES_PATH),
     ...loadCuratedPuzzles(ULTRA_PUZZLES_PATH)
-  ];
+  ]
+    .map(normalizePuzzleShape)
+    .filter(isDisplayQualityPuzzle);
+
   const generated = [
     ...loadGeneratedPhrasePuzzles(CUSTOM_PHRASES_PATH, "custom"),
     ...loadGeneratedPhrasePuzzles(BONUS_PHRASES_PATH, "bonus")
   ];
+
   return dedupePuzzles([...curated, ...generated]);
 }
 
 const puzzleBank = loadPuzzleBank();
-
-function normalizeText(input) {
-  return (input || "")
-    .toLowerCase()
-    .normalize("NFC")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
-}
 
 function shuffleCharacters(token) {
   const chars = [...token];
   if (chars.length <= 1) {
     return token;
   }
+
   let shuffled = [...chars];
   let safe = 0;
   while (shuffled.join("") === chars.join("") && safe < 10) {
@@ -347,6 +399,7 @@ function pickPuzzle(session) {
   const typePool = difficultyPool.filter((item) => item.type === targetType);
   const effectivePool = typePool.length >= 12 ? typePool : difficultyPool.length >= 20 ? difficultyPool : pool;
   const recentTypes = getRecentPuzzleTypes(session);
+
   const scored = effectivePool
     .map((item) => {
       let score = getPuzzlePriorityScore(item);
@@ -379,14 +432,17 @@ function setNextPuzzle(session) {
   if (!puzzle) {
     return null;
   }
+
   session.currentPuzzle = puzzle;
   session.scrambledText = getScrambledDisplay(scrambleAnswer(puzzle.answer));
   session.patternText = getPuzzlePattern(puzzle.answer);
-  session.hintLevel = puzzle.type === "word" ? 0 : 1;
+  session.hintLevel = 0;
   session.usedPuzzleIds.push(puzzle.id);
+
   if (session.usedPuzzleIds.length > 200) {
     session.usedPuzzleIds = session.usedPuzzleIds.slice(-200);
   }
+
   rememberGuildPuzzle(session.guildId, puzzle.id);
   return puzzle;
 }
@@ -395,13 +451,16 @@ async function resolvePuzzleMetadata(puzzle) {
   if (!puzzle || puzzle.type !== "word") {
     return puzzle;
   }
+
   if (puzzle.meaning && puzzle.hint) {
     return puzzle;
   }
+
   const dictionaryResult = await lookupVietnameseDictionary(puzzle.answer);
   if (!dictionaryResult?.accepted || !dictionaryResult.meanings?.length) {
     return puzzle;
   }
+
   const firstMeaning = dictionaryResult.meanings[0];
   return {
     ...puzzle,
@@ -417,18 +476,26 @@ function buildHint(session) {
   }
 
   const tokens = normalizeText(puzzle.answer).split(" ").filter(Boolean);
+  const firstToken = tokens[0] || "";
+  const firstChar = [...firstToken][0] || "?";
+  const difficultyLabel = puzzle.difficulty === "hard" ? "Khó" : puzzle.difficulty === "medium" ? "Vừa" : "Dễ";
+
+  if (session.hintLevel <= 0) {
+    return "Chưa mở gợi ý.";
+  }
+
   if (session.hintLevel === 1) {
-    const difficultyLabel = puzzle.difficulty === "hard" ? "Khó" : puzzle.difficulty === "medium" ? "Vừa" : "Dễ";
     return `Gợi ý 1: Đây là dạng **${getPuzzleTypeLabel(puzzle.type)}**, gồm **${tokens.length} tiếng**, độ khó **${difficultyLabel}**.`;
   }
-  if (session.hintLevel >= 2) {
-    const firstChar = normalizeText(puzzle.answer).replace(/\s+/gu, "")[0] || "?";
-    return `Gợi ý 2: ${puzzle.hint}\nGợi ý 3: ${puzzle.meaning}\nGợi ý 4: Ký tự đầu tiên là **${firstChar}**.`;
+
+  if (session.hintLevel === 2) {
+    return `Gợi ý 1: Đây là dạng **${getPuzzleTypeLabel(puzzle.type)}**, gồm **${tokens.length} tiếng**, độ khó **${difficultyLabel}**.\nGợi ý 2: ${puzzle.hint || "Chưa có mô tả thêm."}`;
   }
-  return "Chưa mở gợi ý.";
+
+  return `Gợi ý 1: Đây là dạng **${getPuzzleTypeLabel(puzzle.type)}**, gồm **${tokens.length} tiếng**, độ khó **${difficultyLabel}**.\nGợi ý 2: ${puzzle.hint || "Chưa có mô tả thêm."}\nGợi ý 3: ${puzzle.meaning || "Chưa có nghĩa giải thích."}\nGợi ý 4: Chữ đầu tiên là **${firstChar}**.`;
 }
 
-function buildScoreboard(scores) {
+function buildScoreboardLines(scores) {
   return [...scores.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([userId, score]) => `<@${userId}>: ${score} điểm`);
@@ -450,7 +517,7 @@ function buildStatusEmbed(session, note = "Chờ người chơi đoán đáp án
     )
     .addFields(
       { name: "Gợi ý hiện tại", value: buildHint(session), inline: false },
-      { name: "Bảng điểm", value: buildScoreboard(session.scores).join("\n") || "Chưa có điểm.", inline: false },
+      { name: "Bảng điểm", value: buildScoreboardLines(session.scores).join("\n") || "Chưa có điểm.", inline: false },
       { name: "Ghi chú", value: note, inline: false }
     )
     .setFooter({ text: "Dùng !trangthai để xem bảng trạng thái, !goiy để mở gợi ý, !stop để kết thúc." });
@@ -463,6 +530,7 @@ async function sendOrRefreshStatusMessage(channel, session, note) {
     session.statusMessageId = sent.id;
     return sent;
   }
+
   try {
     const message = await channel.messages.fetch(session.statusMessageId);
     await message.edit(payload);
@@ -478,11 +546,13 @@ function startSession({ guildId, channelId, channelName, hostUserId, hostUsernam
   if (!isEnabledRoom(channelId)) {
     throw new Error("Phòng này chưa được bật cho Vua Tiếng Việt. Hãy dùng `/vuatiengviet-tao-phong` trước.");
   }
+
   const session = createSession({ guildId, channelId, channelName, hostUserId, hostUsername });
   const puzzle = setNextPuzzle(session);
   if (!puzzle) {
-    throw new Error("Hiện chưa có dữ liệu câu đố cho Vua Tiếng Việt.");
+    throw new Error("Hiện chưa có dữ liệu câu đố đạt chuẩn cho Vua Tiếng Việt.");
   }
+
   sessions.set(channelId, session);
   return session;
 }
@@ -498,7 +568,7 @@ function stopSession(channelId) {
 
 function getSessionStatus(channelId) {
   const session = sessions.get(channelId);
-  return session ? { ...session, scoreboard: buildScoreboard(session.scores) } : null;
+  return session ? { ...session, scoreboard: buildScoreboardLines(session.scores) } : null;
 }
 
 function getRoomConfig(channelId) {
@@ -560,6 +630,7 @@ async function distributeFinalRewards(session) {
   if (!session) {
     return { rewarded: false, lines: ["Không có ván nào để phát thưởng."] };
   }
+
   const ranked = [...session.scores.entries()].filter(([, score]) => score > 0).sort((a, b) => b[1] - a[1]);
   if (ranked.length === 0) {
     return { rewarded: false, lines: ["Ván này chưa có ai ghi điểm."] };
@@ -612,7 +683,7 @@ function getAvailableTextCommandMessage() {
   ].join("\n");
 }
 
-async function advancePuzzle(channel, session, note) {
+async function advancePuzzle(channel, session) {
   const nextPuzzle = setNextPuzzle(session);
   if (!nextPuzzle) {
     return false;
@@ -677,7 +748,7 @@ async function handleMessage(message) {
     return { ok: true, skipReaction: true, reply: "Đã cập nhật bảng trạng thái Vua Tiếng Việt." };
   }
   if (HINT_KEYWORDS.has(lowered)) {
-    session.hintLevel = Math.min(session.hintLevel + 1, 2);
+    session.hintLevel = Math.min(session.hintLevel + 1, 3);
     const currentScore = session.scores.get(message.author.id) || 0;
     const nextScore = Math.max(0, currentScore - HINT_POINT_PENALTY);
     session.scores.set(message.author.id, nextScore);
@@ -691,7 +762,7 @@ async function handleMessage(message) {
   if (STOP_KEYWORDS.has(lowered)) {
     const stoppedSession = stopSession(message.channel.id);
     const rewardResult = await distributeFinalRewards(stoppedSession);
-    const topLine = buildScoreboard(stoppedSession.scores)[0] || "Chưa có ai ghi điểm.";
+    const topLine = buildScoreboardLines(stoppedSession.scores)[0] || "Chưa có ai ghi điểm.";
     return { ok: true, skipReaction: true, reply: `Đã kết thúc ván Vua Tiếng Việt. Dẫn đầu: ${topLine}. ${rewardResult.lines.join(" ")}` };
   }
   if (START_KEYWORDS.has(lowered)) {
@@ -714,7 +785,7 @@ async function handleMessage(message) {
   session.moveCount += 1;
 
   const previousAnswer = session.currentPuzzle.answer;
-  const nextReady = await advancePuzzle(message.channel, session, `<@${userId}> đã đoán đúng **${previousAnswer}**. Câu mới đã sẵn sàng.`);
+  const nextReady = await advancePuzzle(message.channel, session);
 
   if (!nextReady) {
     const rewardResult = await distributeFinalRewards(session);
