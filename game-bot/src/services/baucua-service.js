@@ -583,6 +583,7 @@ async function handleModalInteraction(interaction) {
     return true;
   }
 
+  await interaction.deferReply({ ephemeral: true });
   const amount = Number(interaction.fields.getTextInputValue("amount"));
   const result = await placeBet(session, interaction.user.id, interaction.user.username, parsed.kind, amount);
 
@@ -591,7 +592,7 @@ async function handleModalInteraction(interaction) {
     await sendOrRefreshStatusMessage(interaction.channel, session, `<@${interaction.user.id}> vừa cược ${formatXu(amount)} vào ${animal?.emoji || "🎲"} ${animal?.label || parsed.kind}.`).catch(() => {});
   }
 
-  await interaction.reply({ content: result.reply, ephemeral: true });
+  await interaction.editReply({ content: result.reply });
   return true;
 }
 

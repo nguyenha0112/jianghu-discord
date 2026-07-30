@@ -845,17 +845,15 @@ async function handleButtonInteraction(interaction) {
   }
 
   if (parsed.action === "status") {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferUpdate();
     await sendOrRefreshStatusMessage(interaction.channel, session, "Đây là trạng thái hiện tại của ván.");
-    await interaction.editReply("Đã cập nhật lại bàn Xì Dách hiện tại.");
     return true;
   }
 
   if (parsed.action === "hit") {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferUpdate();
     if (session.playerCards.length >= 5) {
       await settleSession(interaction.channel, session);
-      await interaction.editReply("Ban da du 5 la nen bot chot van theo luat hien tai.");
       return true;
     }
     session.playerCards.push(drawCard(session.deck));
@@ -863,25 +861,16 @@ async function handleButtonInteraction(interaction) {
     const playerNguLinh = isNguLinh(session.playerCards);
     if (playerScore > 21 || playerNguLinh || session.playerCards.length >= 5) {
       await settleSession(interaction.channel, session);
-      await interaction.editReply(
-        playerScore > 21
-          ? "Ban da quac. Bot da chot van va gui ket qua trong phong."
-          : playerNguLinh
-            ? "Ban da du 5 la khong quac, bot chot van theo luat ngu linh."
-            : "Ban da du 5 la nen bot chot van theo luat hien tai."
-      );
       return true;
     }
 
-    await sendOrRefreshStatusMessage(interaction.channel, session, `Ban vua rut them bai. Diem hien tai: ${playerScore}.`);
-    await interaction.editReply("Da cap nhat ban Xi Dach sau luot rut.");
+    await sendOrRefreshStatusMessage(interaction.channel, session, `Bạn vừa rút thêm bài. Điểm hiện tại: ${playerScore}.`);
     return true;
   }
 
   if (parsed.action === "stand") {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferUpdate();
     await settleSession(interaction.channel, session);
-    await interaction.editReply("Đã dừng rút bài và chốt ván. Kết quả đã gửi vào phòng.");
     return true;
   }
 

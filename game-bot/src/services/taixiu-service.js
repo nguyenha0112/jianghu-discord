@@ -728,6 +728,7 @@ async function handleBetModalInteraction(interaction) {
     return true;
   }
 
+  await interaction.deferReply({ ephemeral: true });
   const amount = Number(interaction.fields.getTextInputValue("amount"));
   const target = parsed.kind === "so" ? Number(interaction.fields.getTextInputValue("target")) : null;
   const result = await placeBet(session, interaction.user.id, interaction.user.username, parsed.kind, target, amount);
@@ -740,7 +741,7 @@ async function handleBetModalInteraction(interaction) {
     ).catch(() => {});
   }
 
-  await interaction.reply({ content: result.reply, ephemeral: true });
+  await interaction.editReply({ content: result.reply });
   return true;
 }
 
