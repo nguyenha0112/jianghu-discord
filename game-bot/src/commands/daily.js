@@ -1,5 +1,6 @@
 const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { claimDaily } = require("../services/game-service");
+const { announceLevelUp } = require("../lib/levelup-announcer");
 const { buildCuteLevelField, emojiToTwemojiUrl } = require("../lib/ui-theme");
 
 module.exports = {
@@ -30,5 +31,6 @@ module.exports = {
     }
 
     await interaction.reply({ embeds: [embed] });
+    await announceLevelUp(interaction.client, interaction.guildId, interaction.user, result.levelInfo, "Daily");
   }
 };

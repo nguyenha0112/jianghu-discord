@@ -14,7 +14,8 @@ const roomFiles = [
   { gameKey: "taixiu", fileName: "taixiu-rooms.json" },
   { gameKey: "baucua", fileName: "baucua-rooms.json" },
   { gameKey: "vietnamese_king", fileName: "vietnamese-king-rooms.json" },
-  { gameKey: "xidach", fileName: "xidach-rooms.json" }
+  { gameKey: "xidach", fileName: "xidach-rooms.json" },
+  { gameKey: "levelup_notifications", fileName: "levelup-rooms.json" }
 ];
 
 function isDiscordSnowflake(value) {

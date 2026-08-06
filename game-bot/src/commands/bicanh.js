@@ -1,5 +1,6 @@
 const { EmbedBuilder, SlashCommandBuilder } = require("discord.js");
 const { exploreSecretRealm, getSecretRealmListings } = require("../services/game-service");
+const { announceLevelUp } = require("../lib/levelup-announcer");
 const { emojiToTwemojiUrl, formatItemLabel } = require("../lib/ui-theme");
 
 const secretRealmChoices = getSecretRealmListings().map((entry) => ({
@@ -56,6 +57,7 @@ module.exports = {
             )
         ]
       });
+      await announceLevelUp(interaction.client, interaction.guildId, interaction.user, result.levelInfo, "Bí cảnh");
       return;
     }
 

@@ -53,6 +53,43 @@ function recordCandidatePhrase(phrase, meta = {}) {
   return current;
 }
 
+function listCandidatePhrases({ status = "pending", limit = 10 } = {}) {
+  const store = readStore();
+  return Object.values(store.phrases || {})
+    .filter((item) => !status || item.status === status)
+    .sort((left, right) => {
+      const countDiff = (right.count || 0) - (left.count || 0);
+      if (countDiff !== 0) {
+        return countDiff;
+      }
+      return String(right.lastSeenAt || "").localeCompare(String(left.lastSeenAt || ""));
+    })
+    .slice(0, Math.max(1, Math.min(25, Number(limit) || 10)));
+}
+
+function updateCandidatePhrase(phrase, updates = {}) {
+  const normalizedPhrase = String(phrase || "").trim();
+  if (!normalizedPhrase) {
+    return null;
+  }
+
+  const store = readStore();
+  const current = store.phrases[normalizedPhrase];
+  if (!current) {
+    return null;
+  }
+
+  store.phrases[normalizedPhrase] = {
+    ...current,
+    ...updates,
+    reviewedAt: new Date().toISOString()
+  };
+  writeStore(store);
+  return store.phrases[normalizedPhrase];
+}
+
 module.exports = {
-  recordCandidatePhrase
+  recordCandidatePhrase,
+  listCandidatePhrases,
+  updateCandidatePhrase
 };

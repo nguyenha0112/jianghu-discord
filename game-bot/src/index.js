@@ -8,6 +8,7 @@ const { hydrateRooms: hydrateTaiXiuRooms } = require("./storage/taixiu-room-stor
 const { hydrateRooms: hydrateBauCuaRooms } = require("./storage/baucua-room-store");
 const { hydrateRooms: hydrateVietnameseKingRooms } = require("./storage/vietnamese-king-room-store");
 const { hydrateRooms: hydrateXiDachRooms } = require("./storage/xidach-room-store");
+const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-store");
 const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
 const {
   handleMessage: handleTaiXiuMessage,
@@ -185,7 +186,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (error) {
     console.error(`Command failed: ${interaction.commandName}`, error);
     const payload = {
-      content: "Lenh gap loi. Kiem tra console de debug.",
+      content: "Lệnh gặp lỗi. Kiểm tra console để debug.",
       ephemeral: true
     };
 
@@ -246,7 +247,8 @@ async function bootstrap() {
     hydrateTaiXiuRooms(),
     hydrateBauCuaRooms(),
     hydrateVietnameseKingRooms(),
-    hydrateXiDachRooms()
+    hydrateXiDachRooms(),
+    hydrateLevelUpRooms()
   ]);
 
   await client.login(token);

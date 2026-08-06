@@ -1,12 +1,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { EmbedBuilder } = require("discord.js");
+const { canManageGameRoom } = require("../lib/room-admin");
 const { lookupVietnameseDictionary } = require("../lib/vietnamese-dictionary");
 const { addPlayerXp } = require("../lib/player-progression");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/word-chain-room-store");
-const { recordCandidatePhrase } = require("../storage/word-chain-candidate-store");
+const { listCandidatePhrases, recordCandidatePhrase, updateCandidatePhrase } = require("../storage/word-chain-candidate-store");
 const { getWordChainRanking, updateWordChainRanking } = require("../storage/word-chain-ranking-store");
 
 const sessions = new Map();
@@ -30,6 +31,7 @@ const PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "vietnam
 const CUSTOM_PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
 const BANNED_PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "word-chain-banned-phrases.txt");
 const PREFERRED_PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "word-chain-preferred-phrases.txt");
+const STARTER_PHRASE_DICTIONARY_PATH = path.join(__dirname, "..", "..", "data", "word-chain-starter-phrases.txt");
 
 const FALLBACK_SEEDS = ["niềm vui", "quê nhà", "bình yên", "hy vọng", "gia đình", "vui vẻ", "tình cảm", "hoa hồng"];
 
@@ -38,6 +40,7 @@ const STOP_KEYWORDS = new Set(["!stop"]);
 const HELP_KEYWORDS = new Set(["!help", "!huongdan"]);
 const RANK_KEYWORDS = new Set(["!rank", "!bxh", "!xephang"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
+const ADMIN_PENDING_KEYWORDS = new Set(["!tuduyet", "!pendingtu"]);
 const TEXT_COMMAND_ALIASES = new Map([
   ["!batdau", "Mở ván mới"],
   ["!play", "Mở ván mới"],
@@ -55,6 +58,7 @@ const customPhraseSet = new Set(phraseCatalog.customPhrases);
 const referencePhraseSet = new Set(phraseCatalog.referencePhrases);
 const bannedPhraseSet = new Set(phraseCatalog.bannedPhrases);
 const preferredPhraseSet = new Set(phraseCatalog.preferredPhrases);
+const starterPhraseSet = new Set(phraseCatalog.starterPhrases);
 const phrasesByFirstToken = buildPhraseIndex(validPhraseSet);
 
 function loadPhraseCatalog() {
@@ -64,17 +68,19 @@ function loadPhraseCatalog() {
     const customPhrases = loadPhraseFile(CUSTOM_PHRASE_DICTIONARY_PATH);
     const bannedPhrases = loadPhraseFile(BANNED_PHRASE_DICTIONARY_PATH);
     const preferredPhrases = loadPhraseFile(PREFERRED_PHRASE_DICTIONARY_PATH);
+    const starterPhrases = loadPhraseFile(STARTER_PHRASE_DICTIONARY_PATH);
     const allPhrases =
       referencePhrases.length > 0
-        ? [...new Set([...referencePhrases, ...customPhrases])]
-        : [...new Set([...basePhrases, ...customPhrases])];
+        ? [...new Set([...referencePhrases, ...customPhrases, ...starterPhrases])]
+        : [...new Set([...basePhrases, ...customPhrases, ...starterPhrases])];
 
     return {
       allPhrases: allPhrases.filter((phrase) => !bannedPhrases.includes(phrase)),
       referencePhrases: [...new Set(referencePhrases)],
       customPhrases: [...new Set(customPhrases)],
       bannedPhrases: [...new Set(bannedPhrases)],
-      preferredPhrases: [...new Set(preferredPhrases)]
+      preferredPhrases: [...new Set(preferredPhrases)],
+      starterPhrases: [...new Set(starterPhrases)]
     };
   } catch (error) {
     console.error("Không thể tải dữ liệu nối từ:", error.message);
@@ -84,7 +90,8 @@ function loadPhraseCatalog() {
       referencePhrases: fallback,
       customPhrases: fallback,
       bannedPhrases: [],
-      preferredPhrases: fallback
+      preferredPhrases: fallback,
+      starterPhrases: fallback
     };
   }
 }
@@ -120,6 +127,21 @@ function loadPhraseFile(filePath) {
     .map((line) => normalizePhrase(line))
     .filter(Boolean)
     .filter((phrase) => splitTokens(phrase).length === 2);
+}
+
+function appendUniquePhrase(filePath, phrase) {
+  const normalized = normalizePhrase(phrase).replace(/!/gu, "").trim();
+  if (splitTokens(normalized).length !== 2) {
+    return false;
+  }
+
+  const current = new Set(loadPhraseFile(filePath));
+  if (current.has(normalized)) {
+    return false;
+  }
+
+  fs.appendFileSync(filePath, `${normalized}\n`, "utf8");
+  return true;
 }
 
 function buildPhraseIndex(phrases) {
@@ -195,8 +217,98 @@ function isTextCommand(raw) {
 }
 
 function getAvailableTextCommandMessage() {
-  const commands = [...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`);
+  const commands = [
+    ...[...TEXT_COMMAND_ALIASES.entries()].map(([command, description]) => `- \`${command}\`: ${description}`),
+    "- `!tuduyet`: Admin xem danh sách từ đang chờ duyệt",
+    "- `!duyettu <cụm>`: Admin duyệt cụm 2 tiếng vào bộ từ",
+    "- `!tuchoi <cụm>`: Admin từ chối/cấm cụm không hợp lệ"
+  ];
   return `Lệnh chưa đúng. Bạn có thể dùng:\n${commands.join("\n")}`;
+}
+
+function canManageWordChainText(message) {
+  return canManageGameRoom({ user: message.author, member: message.member });
+}
+
+function parsePhraseAfterCommand(raw, command) {
+  return normalizePhrase(raw.slice(command.length)).replace(/!/gu, "").trim();
+}
+
+function getWordReviewListText(limit = 10) {
+  const items = listCandidatePhrases({ status: "pending", limit });
+  if (items.length === 0) {
+    return "Hiện chưa có từ nối pending cần duyệt.";
+  }
+
+  return [
+    "Danh sách từ nối đang chờ duyệt:",
+    ...items.map((item, index) => `${index + 1}. **${item.phrase}** - ${item.count || 1} lần, nguồn: ${item.source || "người chơi"}`)
+  ].join("\n");
+}
+
+function approveWordChainPhrase(phrase, reviewer) {
+  const normalized = normalizePhrase(phrase).replace(/!/gu, "").trim();
+  if (splitTokens(normalized).length !== 2) {
+    return "Chỉ duyệt cụm đúng 2 tiếng. Ví dụ: `!duyettu đồng lúa`.";
+  }
+
+  appendUniquePhrase(CUSTOM_PHRASE_DICTIONARY_PATH, normalized);
+  validPhraseSet.add(normalized);
+  customPhraseSet.add(normalized);
+  const firstToken = getFirstToken(normalized);
+  if (!phrasesByFirstToken.has(firstToken)) {
+    phrasesByFirstToken.set(firstToken, []);
+  }
+  if (!phrasesByFirstToken.get(firstToken).includes(normalized)) {
+    phrasesByFirstToken.get(firstToken).push(normalized);
+  }
+  updateCandidatePhrase(normalized, { status: "approved", reviewedBy: reviewer });
+  return `Đã duyệt **${normalized}** vào bộ từ nối.`;
+}
+
+function rejectWordChainPhrase(phrase, reviewer) {
+  const normalized = normalizePhrase(phrase).replace(/!/gu, "").trim();
+  if (splitTokens(normalized).length !== 2) {
+    return "Chỉ từ chối cụm đúng 2 tiếng. Ví dụ: `!tuchoi từ sai`.";
+  }
+
+  appendUniquePhrase(BANNED_PHRASE_DICTIONARY_PATH, normalized);
+  bannedPhraseSet.add(normalized);
+  validPhraseSet.delete(normalized);
+  const firstToken = getFirstToken(normalized);
+  if (phrasesByFirstToken.has(firstToken)) {
+    phrasesByFirstToken.set(
+      firstToken,
+      phrasesByFirstToken.get(firstToken).filter((item) => item !== normalized)
+    );
+  }
+  updateCandidatePhrase(normalized, { status: "rejected", reviewedBy: reviewer });
+  return `Đã từ chối **${normalized}** và đưa vào danh sách cấm.`;
+}
+
+function handleAdminWordReviewCommand(message, raw, lowered) {
+  if (ADMIN_PENDING_KEYWORDS.has(lowered)) {
+    if (!canManageWordChainText(message)) {
+      return { ok: false, silent: false, skipReaction: true, reply: "Bạn cần quyền quản trị game để xem danh sách duyệt từ." };
+    }
+    return { ok: true, silent: false, skipReaction: true, reply: getWordReviewListText(10) };
+  }
+
+  if (lowered.startsWith("!duyettu")) {
+    if (!canManageWordChainText(message)) {
+      return { ok: false, silent: false, skipReaction: true, reply: "Bạn cần quyền quản trị game để duyệt từ." };
+    }
+    return { ok: true, silent: false, skipReaction: true, reply: approveWordChainPhrase(parsePhraseAfterCommand(raw, "!duyettu"), message.author.id) };
+  }
+
+  if (lowered.startsWith("!tuchoi")) {
+    if (!canManageWordChainText(message)) {
+      return { ok: false, silent: false, skipReaction: true, reply: "Bạn cần quyền quản trị game để từ chối từ." };
+    }
+    return { ok: true, silent: false, skipReaction: true, reply: rejectWordChainPhrase(parsePhraseAfterCommand(raw, "!tuchoi"), message.author.id) };
+  }
+
+  return null;
 }
 
 function getGuildHistory(guildId) {
@@ -302,7 +414,7 @@ function evaluatePveSeedPhrase(phrase, guildId) {
 
 function pickSeedPhrase(guildId, excludedPhrases = [], mode = "pvp") {
   const excluded = new Set(excludedPhrases.map((phrase) => normalizePhrase(phrase)));
-  const seedPool = [...new Set([...preferredPhraseSet, ...customPhraseSet, ...FALLBACK_SEEDS.map((item) => normalizePhrase(item))])].filter(
+  const seedPool = [...new Set([...starterPhraseSet, ...preferredPhraseSet, ...customPhraseSet, ...FALLBACK_SEEDS.map((item) => normalizePhrase(item))])].filter(
     (phrase) => splitTokens(phrase).length === 2 && !excluded.has(phrase) && !findRecentUsage(guildId, phrase)
   );
 
@@ -927,6 +1039,10 @@ async function handleWordChainMessage(message) {
   const lowered = raw.toLowerCase();
   let session = sessions.get(message.channel.id);
   const roomMode = getRoomMode(message.channel.id);
+  const adminCommandResult = handleAdminWordReviewCommand(message, raw, lowered);
+  if (adminCommandResult) {
+    return adminCommandResult;
+  }
 
   if (!session) {
     if (HELP_KEYWORDS.has(lowered)) {
