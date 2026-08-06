@@ -38,6 +38,9 @@ game-bot/data/
 game-bot/data/*
 !game-bot/data/vietnamese-compound-phrases.txt
 !game-bot/data/custom-vietnamese-phrases.txt
+!game-bot/data/reference-wordPairs.json
+!game-bot/data/word-chain-banned-phrases.txt
+!game-bot/data/word-chain-preferred-phrases.txt
 !game-bot/data/vietnamese-king-bonus-phrases.txt
 !game-bot/data/vietnamese-king-bonus-puzzles.json
 !game-bot/data/vietnamese-king-ultra-puzzles.json
