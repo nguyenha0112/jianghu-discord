@@ -1,4 +1,4 @@
-const createRoomStore = require("./create-room-store");
+const { createRoomStore } = require("./create-room-store");
 
 module.exports = createRoomStore({
   gameKey: "levelup_notifications",

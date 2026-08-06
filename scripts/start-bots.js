@@ -24,6 +24,7 @@ function oneOfRequired(names) {
 }
 
 function startProcess(label, cwd, script, env) {
+  console.log(`[launcher] starting ${label}`, { cwd, script });
   const child = spawn(process.execPath, [script], {
     cwd,
     env: { ...process.env, ...env },
@@ -33,6 +34,11 @@ function startProcess(label, cwd, script, env) {
   child.on("exit", (code, signal) => {
     console.error(`[${label}] exited`, { code, signal });
     process.exitCode = code || 1;
+  });
+
+  child.on("error", (error) => {
+    console.error(`[${label}] failed to start`, { message: error.message });
+    process.exitCode = 1;
   });
 
   return child;

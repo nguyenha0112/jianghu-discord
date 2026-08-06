@@ -31,6 +31,10 @@ const token = process.env.DISCORD_TOKEN;
 const runtimeDir = path.join(__dirname, "..", "data", "runtime");
 const lockFile = path.join(runtimeDir, "bot.lock");
 
+function logStartup(message, meta = {}) {
+  console.log(`[startup] ${message}`, meta);
+}
+
 if (!token) {
   console.error("Thieu DISCORD_TOKEN trong game-bot/.env");
   process.exit(1);
@@ -106,9 +110,10 @@ for (const file of commandFiles) {
     console.warn(`Bo qua command khong hop le: ${file}`);
   }
 }
+logStartup("commands loaded", { count: client.commands.size });
 
 client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Jianghu Game Bot da dang nhap voi ten ${readyClient.user.tag}`);
+  console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -178,11 +183,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const command = client.commands.get(interaction.commandName);
   if (!command) {
+    console.warn("[interaction] command not found", { commandName: interaction.commandName, userId: interaction.user?.id });
     return;
   }
 
   try {
+    console.log("[interaction] command start", {
+      commandName: interaction.commandName,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      userId: interaction.user.id
+    });
     await command.execute(interaction);
+    console.log("[interaction] command success", {
+      commandName: interaction.commandName,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      userId: interaction.user.id
+    });
   } catch (error) {
     console.error(`Command failed: ${interaction.commandName}`, error);
     const payload = {
@@ -203,16 +221,36 @@ client.on(Events.MessageCreate, async (message) => {
     return;
   }
 
-  const result = await handleWordChainMessage(message);
-  const finalResult =
-    result ||
-    (await handleVietnameseKingMessage(message)) ||
-    (await handleTaiXiuMessage(message)) ||
-    (await handleBauCuaMessage(message)) ||
-    (await handleXiDachMessage(message));
+  let handlerName = "word-chain";
+  let finalResult = await handleWordChainMessage(message);
+  if (!finalResult) {
+    handlerName = "vietnamese-king";
+    finalResult = await handleVietnameseKingMessage(message);
+  }
+  if (!finalResult) {
+    handlerName = "taixiu";
+    finalResult = await handleTaiXiuMessage(message);
+  }
+  if (!finalResult) {
+    handlerName = "baucua";
+    finalResult = await handleBauCuaMessage(message);
+  }
+  if (!finalResult) {
+    handlerName = "xidach";
+    finalResult = await handleXiDachMessage(message);
+  }
   if (!finalResult) {
     return;
   }
+
+  console.log("[message] handled", {
+    handler: handlerName,
+    ok: Boolean(finalResult.ok),
+    silent: Boolean(finalResult.silent),
+    guildId: message.guild.id,
+    channelId: message.channel.id,
+    userId: message.author.id
+  });
 
   const reaction =
     finalResult.react || (finalResult.skipReaction ? null : finalResult.ok ? "success" : "failure");
@@ -242,6 +280,7 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 async function bootstrap() {
+  logStartup("hydrating room config");
   await Promise.all([
     hydrateWordChainRooms(),
     hydrateTaiXiuRooms(),
@@ -250,7 +289,13 @@ async function bootstrap() {
     hydrateXiDachRooms(),
     hydrateLevelUpRooms()
   ]);
+  logStartup("room config hydrated");
 
+  logStartup("logging in Discord", {
+    commands: client.commands.size,
+    guildId: process.env.DISCORD_GUILD_ID || null,
+    supabase: Boolean(process.env.SUPABASE_URL)
+  });
   await client.login(token);
 }
 
