@@ -1,6 +1,7 @@
 const { disableRoom, enableRoom } = require("../storage/word-chain-room-store");
 const {
   maybeAwardPvpCheckpoint,
+  countAvailableFollowups,
   distributeFinalRewards,
   findPlayablePhraseForToken,
   getSessionStatus,
@@ -124,9 +125,17 @@ async function runPveFlow() {
     );
   }
 
+  const sessionAfterBotReply = getSessionStatus(channelId);
+  const remainingPlayerReplies = countAvailableFollowups(sessionAfterBotReply.requiredToken, sessionAfterBotReply);
+  if (remainingPlayerReplies < 3) {
+    throw new Error(
+      `PvE bot made the early round too hard | current=${sessionAfterBotReply.currentPhrase} | required=${sessionAfterBotReply.requiredToken} | replies=${remainingPlayerReplies}`
+    );
+  }
+
   stopSession(channelId);
   disableRoom(channelId);
-  return { acceptedReply: validReply };
+  return { acceptedReply: validReply, remainingPlayerReplies };
 }
 
 async function runTextCommandFlow() {

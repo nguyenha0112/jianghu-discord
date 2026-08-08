@@ -399,15 +399,51 @@ function getCandidateRepliesForToken(token, session, excludedPhrases = []) {
   });
 }
 
+function getPveDifficultyProfile(sessionOrMoveCount = 0) {
+  const moveCount = typeof sessionOrMoveCount === "number" ? sessionOrMoveCount : sessionOrMoveCount?.moveCount || 0;
+  if (moveCount < 6) {
+    return {
+      label: "easy",
+      targetReplies: 14,
+      minSafeReplies: 7,
+      maxShortlist: 28,
+      trapWeight: -45,
+      pressureWeight: 18,
+      counterWeight: 3
+    };
+  }
+  if (moveCount < 16) {
+    return {
+      label: "normal",
+      targetReplies: 9,
+      minSafeReplies: 4,
+      maxShortlist: 24,
+      trapWeight: -10,
+      pressureWeight: 4,
+      counterWeight: 5
+    };
+  }
+  return {
+    label: "hard",
+    targetReplies: 5,
+    minSafeReplies: 1,
+    maxShortlist: 18,
+    trapWeight: 18,
+    pressureWeight: -24,
+    counterWeight: 8
+  };
+}
+
 function evaluatePveSeedPhrase(phrase, guildId) {
   const requiredToken = getLastToken(phrase);
   const playerReplies = getCandidateRepliesForToken(requiredToken, { guildId, roundUsed: new Set([phrase]) }, [phrase]);
   const replyCount = playerReplies.length;
-  const targetReplyCount = 5;
+  const profile = getPveDifficultyProfile(0);
+  const targetReplyCount = profile.targetReplies;
   const averageReplyPreference =
     replyCount > 0 ? playerReplies.reduce((sum, item) => sum + getPhrasePreferenceScore(item), 0) / replyCount : 0;
-  const closenessScore = Math.max(0, 40 - Math.abs(replyCount - targetReplyCount) * 6);
-  const difficultyScore = replyCount === 0 ? -120 : replyCount <= 2 ? -35 : replyCount <= 8 ? 35 : replyCount <= 14 ? 20 : 5;
+  const closenessScore = Math.max(0, 55 - Math.abs(replyCount - targetReplyCount) * 4);
+  const difficultyScore = replyCount === 0 ? -150 : replyCount < profile.minSafeReplies ? -60 : replyCount <= 18 ? 45 : 20;
   const naturalnessScore = averageReplyPreference >= 50 ? 25 : averageReplyPreference >= 20 ? 12 : -30;
   return getPhrasePreferenceScore(phrase) + closenessScore + difficultyScore + naturalnessScore;
 }
@@ -824,9 +860,10 @@ function buildHypotheticalSession(session, extraUsed = []) {
 function evaluateBotReplyStrength(session, phrase) {
   const nextToken = getLastToken(phrase);
   const humanReplies = getCandidateRepliesForToken(nextToken, session, [phrase]).slice(0, 10);
+  const profile = getPveDifficultyProfile(session);
 
   if (humanReplies.length === 0) {
-    return 100000 + getPhrasePreferenceScore(phrase);
+    return profile.label === "hard" ? 100000 + getPhrasePreferenceScore(phrase) : -100000 + getPhrasePreferenceScore(phrase);
   }
 
   let totalBotCounters = 0;
@@ -859,12 +896,14 @@ function evaluateBotReplyStrength(session, phrase) {
   }
 
   const averageBotCounters = totalBotCounters / humanReplies.length;
-  const pressureScore = -humanReplies.length * 24;
-  const counterScore = averageBotCounters * 8 + minBotCounters * 10;
-  const trapScore = trapReplies * 18;
+  const replyCountScore = Math.max(0, 60 - Math.abs(humanReplies.length - profile.targetReplies) * 5);
+  const safetyScore = humanReplies.length < profile.minSafeReplies ? -80 : 0;
+  const pressureScore = humanReplies.length * profile.pressureWeight;
+  const counterScore = averageBotCounters * profile.counterWeight + minBotCounters * Math.max(2, profile.counterWeight);
+  const trapScore = trapReplies * profile.trapWeight;
   const preferenceScore = getPhrasePreferenceScore(phrase) * 4;
 
-  return preferenceScore + pressureScore + counterScore + trapScore;
+  return preferenceScore + replyCountScore + safetyScore + pressureScore + counterScore + trapScore;
 }
 
 function chooseBotReply(session) {
@@ -879,8 +918,14 @@ function chooseBotReply(session) {
       replyCount: countAvailableFollowups(getLastToken(phrase), session, phrase),
       preference: getPhrasePreferenceScore(phrase)
     }))
-    .sort((left, right) => left.replyCount - right.replyCount || right.preference - left.preference || left.phrase.localeCompare(right.phrase, "vi"))
-    .slice(0, 18)
+    .sort((left, right) => {
+      const profile = getPveDifficultyProfile(session);
+      if (profile.label === "hard") {
+        return left.replyCount - right.replyCount || right.preference - left.preference || left.phrase.localeCompare(right.phrase, "vi");
+      }
+      return right.replyCount - left.replyCount || right.preference - left.preference || left.phrase.localeCompare(right.phrase, "vi");
+    })
+    .slice(0, getPveDifficultyProfile(session).maxShortlist)
     .map((entry) => entry.phrase);
 
   const scored = shortlisted
