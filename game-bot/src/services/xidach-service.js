@@ -8,12 +8,12 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
-const os = require("node:os");
+const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 const { addPlayerXp } = require("../lib/player-progression");
+const { canManageGameRoom } = require("../lib/room-admin");
 const { buildProgressBar } = require("../lib/ui-theme");
-const { buildCurrencyPairAttachment, buildXuAttachment } = require("../lib/currency-assets");
+const { buildCurrencyPairAttachment } = require("../lib/currency-assets");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
@@ -26,7 +26,7 @@ const {
 
 const sessions = new Map();
 
-const START_RE = /^!(play|batdau|xidach)\s+(\d+)$/u;
+const START_RE = /^!(play|batdau|xidach)\s+(.+)$/u;
 const STOP_KEYWORDS = new Set(["!stop", "!out"]);
 const HELP_KEYWORDS = new Set(["!help", "!huongdan"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
@@ -60,7 +60,8 @@ const SUITS = [
   { code: "C", symbol: "♣" }
 ];
 
-const renderScriptPath = path.join(__dirname, "..", "lib", "render_xidach_board.py");
+const CARD_DIR = path.join(__dirname, "..", "..", "assets", "cards");
+const STALE_SESSION_MS = 5 * 60 * 1000;
 
 function normalizeText(input) {
   return (input || "").trim().toLowerCase();
@@ -72,6 +73,14 @@ function formatNumber(value) {
 
 function formatXu(value) {
   return `Xu ${formatNumber(value)}`;
+}
+
+function parseBetAmount(input) {
+  const normalized = String(input || "").replace(/[^\d]/g, "");
+  if (!normalized) {
+    return NaN;
+  }
+  return Number(normalized);
 }
 
 function buildDeck() {
@@ -166,22 +175,95 @@ function buildBoardPayload(session, options = {}) {
   };
 }
 
+function escapeXml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function cardAssetName(card) {
+  return `${card.rank}${card.suitCode || card.assetCode}.png`;
+}
+
+function cardDataUri(card, hidden = false) {
+  const filePath = path.join(CARD_DIR, hidden ? "BACK.png" : cardAssetName(card));
+  const data = fs.readFileSync(filePath).toString("base64");
+  return `data:image/png;base64,${data}`;
+}
+
+function buildCardImages(cards, { x, y, hiddenAfterFirst = false } = {}) {
+  return cards
+    .map((card, index) => {
+      const hidden = hiddenAfterFirst && index > 0;
+      const href = cardDataUri(card, hidden);
+      const cardX = x + index * 54;
+      return `<image href="${href}" x="${cardX}" y="${y}" width="70" height="98" preserveAspectRatio="xMidYMid meet"/>`;
+    })
+    .join("");
+}
+
+function buildXuIconAttachment(attachmentName = "xu.svg") {
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">',
+    '<defs><radialGradient id="g" cx="36%" cy="30%"><stop offset="0" stop-color="#fff3bd"/><stop offset="0.45" stop-color="#d2a152"/><stop offset="1" stop-color="#6d4526"/></radialGradient></defs>',
+    '<circle cx="64" cy="64" r="50" fill="url(#g)" stroke="#f7d78a" stroke-width="6"/>',
+    '<circle cx="64" cy="64" r="33" fill="none" stroke="#8b5a2e" stroke-width="5" opacity="0.85"/>',
+    '<path d="M42 55h44M42 73h44M64 37v54" stroke="#fff0b5" stroke-width="7" stroke-linecap="round"/>',
+    '<path d="M50 45c12-10 34-4 35 15 1 21-24 28-41 16" fill="none" stroke="#5b351e" stroke-width="5" stroke-linecap="round"/>',
+    '</svg>'
+  ].join("");
+  return new AttachmentBuilder(Buffer.from(svg, "utf8"), { name: attachmentName });
+}
+
 function buildBoardAttachment(session, options = {}) {
-  const outputPath = path.join(
-    os.tmpdir(),
-    `xidach-board-${session.channelId}-${options.revealDealer ? "reveal" : "live"}.png`
-  );
+  const payload = buildBoardPayload(session, options);
+  const dealerHidden = !payload.revealDealer;
+  const safeNote = escapeXml(payload.note);
+  const safePlayerName = escapeXml(payload.playerName);
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+  <defs>
+    <linearGradient id="felt" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#123f32"/>
+      <stop offset="1" stop-color="#071f19"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="900" height="420" rx="28" fill="url(#felt)"/>
+  <rect x="18" y="18" width="864" height="384" rx="24" fill="none" stroke="#d8b66f" stroke-width="4"/>
+  <text x="42" y="58" fill="#fff2d2" font-family="Arial, sans-serif" font-size="30" font-weight="700">${escapeXml(payload.title)}</text>
+  <text x="42" y="88" fill="#a7d3bd" font-family="Arial, sans-serif" font-size="16">Xì Dách Jianghu</text>
 
-  const result = spawnSync("python", [renderScriptPath, outputPath], {
-    input: JSON.stringify(buildBoardPayload(session, options)),
-    encoding: "utf8"
-  });
+  <g filter="url(#shadow)">
+    <rect x="42" y="116" width="540" height="126" rx="20" fill="#145540" stroke="#4fa27d"/>
+    <text x="66" y="150" fill="#fff2d2" font-family="Arial, sans-serif" font-size="20" font-weight="700">Người chơi: ${safePlayerName}</text>
+    <text x="66" y="178" fill="#e6f1e9" font-family="Arial, sans-serif" font-size="17">Điểm: ${payload.playerScore} • Cược: ${escapeXml(payload.betText)}</text>
+    ${buildCardImages(payload.playerCards, { x: 328, y: 132 })}
+  </g>
 
-  if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || "Khong render duoc anh ban Xi Dach.");
-  }
+  <g filter="url(#shadow)">
+    <rect x="42" y="266" width="540" height="112" rx="20" fill="#0f4335" stroke="#3f8b6e"/>
+    <text x="66" y="300" fill="#fff2d2" font-family="Arial, sans-serif" font-size="20" font-weight="700">Nhà cái</text>
+    <text x="66" y="328" fill="#e6f1e9" font-family="Arial, sans-serif" font-size="17">Điểm: ${escapeXml(payload.dealerScoreText)}</text>
+    ${buildCardImages(payload.dealerCards, { x: 328, y: 273, hiddenAfterFirst: dealerHidden })}
+  </g>
 
-  return new AttachmentBuilder(outputPath, { name: "xidach-board.png" });
+  <g filter="url(#shadow)">
+    <rect x="614" y="116" width="244" height="262" rx="20" fill="#0a362b" stroke="#4f9d7c"/>
+    <text x="638" y="152" fill="#fff2d2" font-family="Arial, sans-serif" font-size="20" font-weight="700">Thông tin ván</text>
+    <text x="638" y="190" fill="#e6f1e9" font-family="Arial, sans-serif" font-size="16">${safeNote}</text>
+    <text x="638" y="232" fill="#b9dccb" font-family="Arial, sans-serif" font-size="15">Bài bạn: ${payload.playerCards.length} lá</text>
+    <text x="638" y="260" fill="#b9dccb" font-family="Arial, sans-serif" font-size="15">Bài nhà cái: ${payload.dealerCards.length} lá</text>
+    <text x="638" y="304" fill="#f4d58d" font-family="Arial, sans-serif" font-size="15">Rút tối đa 5 lá.</text>
+    <text x="638" y="330" fill="#f4d58d" font-family="Arial, sans-serif" font-size="15">5 lá không quá 21 là Ngũ Linh.</text>
+  </g>
+</svg>`;
+
+  return new AttachmentBuilder(Buffer.from(svg, "utf8"), { name: "xidach-board.svg" });
 }
 
 function buildVisualAttachments(session, options = {}) {
@@ -205,8 +287,30 @@ function createSession({ guildId, channelId, channelName, hostUserId, hostUserna
     dealerCards,
     statusMessageId: null,
     phase: "playing",
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: Date.now()
   };
+}
+
+function touchSession(session) {
+  if (session) {
+    session.updatedAt = Date.now();
+  }
+}
+
+function isStaleSession(session) {
+  return !session?.updatedAt || Date.now() - session.updatedAt > STALE_SESSION_MS;
+}
+
+function canStopSession(user, member, session) {
+  return user?.id === session.hostUserId || canManageGameRoom({ user, member }) || isStaleSession(session);
+}
+
+function getActiveSessionText(session) {
+  const staleHint = isStaleSession(session)
+    ? "Ván đã treo quá 5 phút, người khác có thể dùng `!stop` để dọn."
+    : "Chỉ chủ ván hoặc admin có thể dùng `!stop` để hủy.";
+  return `Phòng đang có ván Xì Dách của <@${session.hostUserId}> với cược ${formatXu(session.betAmount)}. ${staleHint}`;
 }
 
 function buildActionComponents(session) {
@@ -260,18 +364,18 @@ function buildLobbyComponents(channelId) {
 function buildLobbyEmbed() {
   return new EmbedBuilder()
     .setColor(0x8e44ad)
-    .setTitle("Mo van Xi Dach")
-    .setThumbnail("attachment://xu.png")
+    .setTitle("Mở ván Xì Dách")
+    .setThumbnail("attachment://xu.svg")
     .setDescription(
       [
-        "Chon nhanh mot muc cuoc ben duoi de vao van.",
-        `Cuoc toi thieu: **${formatXu(MIN_BET)}**`,
-        `Cuoc toi da: **${formatXu(MAX_BET)}**`,
-        "Ban cung co the bam **Nhap cuoc** de dien so tien bat ky.",
-        "Hoac go tay: `!play 1000`."
+        "Chọn nhanh một mức cược bên dưới để vào ván.",
+        `Cược tối thiểu: **${formatXu(MIN_BET)}**`,
+        `Cược tối đa: **${formatXu(MAX_BET)}**`,
+        "Bạn cũng có thể bấm **Nhập cược** để điền số tiền bất kỳ.",
+        "Hoặc gõ tay: `!play 1000`."
       ].join("\n")
     )
-    .setFooter({ text: "Sau khi vao van, bam Rut hoac Dung de choi." });
+    .setFooter({ text: "Sau khi vào ván, bấm Rút hoặc Dừng để chơi." });
 }
 
 function buildBetModal(channelId) {
@@ -309,8 +413,8 @@ function buildStatusEmbed(session, note = "Den luot nguoi choi quyet dinh.") {
       ].join("\n")
     )
     .addFields({ name: "Thong bao", value: note, inline: false })
-    .setImage("attachment://xidach-board.png")
-    .setFooter({ text: "Ban bai duoc canh lai de de nhin hon tren Discord." });
+    .setImage("attachment://xidach-board.svg")
+    .setFooter({ text: "Bàn bài dùng icon nhỏ để dễ nhìn hơn trên Discord mobile." });
 }
 
 function buildSettlementEmbed(session, resultText) {
@@ -328,8 +432,8 @@ function buildSettlementEmbed(session, resultText) {
         `**Nha cai - ${dealerScore}:** ${formatCardList(session.dealerCards)}`
       ].join("\n")
     )
-    .setImage("attachment://xidach-board.png")
-    .setFooter({ text: "Ban bai cuoi da duoc render thanh mot khung tong hop." });
+    .setImage("attachment://xidach-board.svg")
+    .setFooter({ text: "Bàn bài cuối đã được render thành một khung tổng hợp." });
 }
 
 async function sendOrRefreshStatusMessage(channel, session, note) {
@@ -791,7 +895,7 @@ async function handleButtonInteraction(interaction) {
   if (!session && parsed.action === "start") {
     try {
       await interaction.deferReply({ ephemeral: true });
-      const betAmount = Number(parsed.value);
+      const betAmount = parseBetAmount(parsed.value);
       const nextSession = await startRound({
         guildId: interaction.guildId,
         channelId: interaction.channelId,
@@ -820,18 +924,20 @@ async function handleButtonInteraction(interaction) {
   }
 
   if (interaction.user.id !== session.hostUserId) {
-    await interaction.reply({ content: "Chi nguoi mo van moi duoc bam nut trong van nay.", ephemeral: true });
+    await interaction.reply({ content: `${getActiveSessionText(session)} Bạn không phải chủ ván nên không bấm nút được.`, ephemeral: true });
     return true;
   }
 
   if (parsed.action === "status") {
     await interaction.deferUpdate();
+    touchSession(session);
     await sendOrRefreshStatusMessage(interaction.channel, session, "Day la trang thai hien tai cua van.");
     return true;
   }
 
   if (parsed.action === "hit") {
     await interaction.deferUpdate();
+    touchSession(session);
     if (session.playerCards.length >= 5) {
       await settleSession(interaction.channel, session);
       return true;
@@ -850,6 +956,7 @@ async function handleButtonInteraction(interaction) {
 
   if (parsed.action === "stand") {
     await interaction.deferUpdate();
+    touchSession(session);
     await settleSession(interaction.channel, session);
     return true;
   }
@@ -865,7 +972,7 @@ async function handleModalInteraction(interaction) {
 
   try {
     await interaction.deferReply({ ephemeral: true });
-    const betAmount = Number(interaction.fields.getTextInputValue("amount"));
+    const betAmount = parseBetAmount(interaction.fields.getTextInputValue("amount"));
     const nextSession = await startRound({
       guildId: interaction.guildId,
       channelId: interaction.channelId,
@@ -926,8 +1033,8 @@ async function handleMessage(message) {
     if (!session) {
       return { ok: false, reply: "Khong co van Xi Dach nao de huy." };
     }
-    if (message.author.id !== session.hostUserId) {
-      return { ok: false, reply: "Chi nguoi mo van moi co the huy van Xi Dach nay." };
+    if (!canStopSession(message.author, message.member, session)) {
+      return { ok: false, reply: getActiveSessionText(session) };
     }
     stopSession(message.channel.id);
     const refundText = await refundSession(session);
@@ -937,7 +1044,7 @@ async function handleMessage(message) {
 
   if (lowered === "!play" || lowered === "!batdau" || lowered === "!xidach") {
     if (session) {
-      return { ok: false, reply: "Phong nay dang co van Xi Dach roi. Hay choi xong hoac `!stop` truoc." };
+      return { ok: false, skipReaction: true, reply: getActiveSessionText(session) };
     }
 
     return {
@@ -945,14 +1052,14 @@ async function handleMessage(message) {
       skipReaction: true,
       embeds: [buildLobbyEmbed()],
       components: buildLobbyComponents(message.channel.id),
-      files: [buildXuAttachment("xu.png")]
+      files: [buildXuIconAttachment("xu.svg")]
     };
   }
 
   const match = raw.match(START_RE);
   if (match) {
     try {
-      const betAmount = Number(match[2]);
+      const betAmount = parseBetAmount(match[2]);
       const nextSession = await startRound({
         guildId: message.guild.id,
         channelId: message.channel.id,
@@ -982,6 +1089,7 @@ module.exports = {
   buildRoomGuideText,
   getRoomConfig,
   getSessionStatus,
+  stopSession,
   handleButtonInteraction,
   handleModalInteraction,
   handleMessage

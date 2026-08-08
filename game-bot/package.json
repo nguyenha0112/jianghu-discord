@@ -18,7 +18,8 @@
     "vttv:import-sample": "node src/scripts/import-vietnamese-king-candidates.js data/vietnamese-king-bulk-sample.txt",
     "vttv:promote": "node src/scripts/promote-vietnamese-king-candidates.js",
     "seed:test-account": "node src/scripts/seed-test-account.js",
-    "taixiu:test": "node src/scripts/test-taixiu.js"
+    "taixiu:test": "node src/scripts/test-taixiu.js",
+    "xidach:test": "node src/scripts/test-xidach.js"
   },
   "license": "MIT",
   "dependencies": {
