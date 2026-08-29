@@ -64,6 +64,7 @@ healthServer.listen(port, "0.0.0.0", () => {
 const chatEnv = {
   DISCORD_TOKEN: requiredEnv("DISCORD_TOKEN_1"),
   DISCORD_CLIENT_ID: optionalEnv("DISCORD_CLIENT_ID_1"),
+  DISCORD_GUILD_ID: optionalEnv("DISCORD_GUILD_ID_1", optionalEnv("DISCORD_GUILD_ID")),
   PREFIX: optionalEnv("PREFIX", "!")
 };
 
