@@ -36,6 +36,13 @@ async function sendGuide(interaction, title, description, color) {
   }).catch(() => {});
 }
 
+function formatSetupResult(successMessage, result) {
+  if (result.persisted) {
+    return successMessage;
+  }
+  return "Tạo lỗi, vui lòng liên hệ Lục Hà.";
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("admin")
@@ -144,11 +151,7 @@ module.exports = {
 
       if (action === "levelup_tao") {
         const result = await enableLevelUpRoomPersistent(interaction.guildId, meta);
-        await interaction.editReply(
-          result.persisted
-            ? `Đã đặt <#${interaction.channelId}> làm phòng thông báo lên cấp và đã lưu Supabase.`
-            : `Đã bật tạm <#${interaction.channelId}> làm phòng thông báo lên cấp, nhưng chưa lưu được Supabase: ${result.reason}`
-        );
+        await interaction.editReply(formatSetupResult(`Tạo thành công phòng thông báo lên cấp tại <#${interaction.channelId}>.`, result));
         return;
       }
 
@@ -160,11 +163,7 @@ module.exports = {
 
       if (action === "serverlog_tao") {
         const result = await enableServerLogRoomPersistent(interaction.guildId, meta);
-        await interaction.editReply(
-          result.persisted
-            ? `Đã đặt <#${interaction.channelId}> làm phòng log người rời server và đã lưu Supabase.`
-            : `Đã bật tạm <#${interaction.channelId}> làm phòng log người rời server, nhưng chưa lưu được Supabase: ${result.reason}`
-        );
+        await interaction.editReply(formatSetupResult(`Tạo thành công phòng log người rời server tại <#${interaction.channelId}>.`, result));
         return;
       }
 
