@@ -30,6 +30,7 @@ const TTS_HOSTS = (process.env.TTS_HOSTS || "https://translate.google.com,https:
   .split(",")
   .map((host) => host.trim())
   .filter(Boolean);
+const TTS_SPEED = Math.min(2, Math.max(0.5, Number(process.env.TTS_SPEED || 1.2)));
 
 if (!TOKEN) {
   console.error("[chat-bot] Missing DISCORD_TOKEN in env");
@@ -161,6 +162,8 @@ async function createResourceFromTTS(text) {
           "pipe:0",
           "-f",
           "s16le",
+          "-filter:a",
+          `atempo=${TTS_SPEED}`,
           "-ar",
           "48000",
           "-ac",
