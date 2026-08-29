@@ -74,6 +74,19 @@ function log(message, meta = {}) {
   console.log(`[chat-bot] ${message}`, meta);
 }
 
+function assertVoiceRuntime() {
+  try {
+    const encoder = new prism.opus.Encoder({ rate: 48000, channels: 2, frameSize: 960 });
+    encoder.destroy();
+    log("voice runtime ready", { opusEncoder: true });
+  } catch (error) {
+    console.error("[chat-bot] Missing Opus encoder. Install opusscript or @discordjs/opus.", {
+      message: error.message
+    });
+    process.exit(1);
+  }
+}
+
 function getState(guildId) {
   if (!guildStates.has(guildId)) {
     const player = createAudioPlayer({
@@ -400,6 +413,7 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 async function bootstrap() {
+  assertVoiceRuntime();
   await registerSlashCommands().catch((error) => {
     log("slash register failed", { message: error.message });
   });
