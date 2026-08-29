@@ -31,6 +31,9 @@ const {
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 
 const token = process.env.DISCORD_TOKEN;
+const enableMemberLogs = ["1", "true", "yes", "on"].includes(
+  String(process.env.DISCORD_ENABLE_MEMBER_LOGS || "").toLowerCase()
+);
 const runtimeDir = path.join(__dirname, "..", "data", "runtime");
 const lockFile = path.join(runtimeDir, "bot.lock");
 
@@ -95,13 +98,18 @@ process.on("SIGTERM", () => {
   process.exit(0);
 });
 
+const clientIntents = [
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.MessageContent
+];
+
+if (enableMemberLogs) {
+  clientIntents.push(GatewayIntentBits.GuildMembers);
+}
+
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.MessageContent
-  ]
+  intents: clientIntents
 });
 
 client.commands = new Collection();
@@ -122,9 +130,15 @@ logStartup("commands loaded", { count: client.commands.size });
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
+  if (!enableMemberLogs) {
+    console.warn("[serverlog] member leave logs disabled. Set DISCORD_ENABLE_MEMBER_LOGS=true after enabling SERVER MEMBERS INTENT in Discord Developer Portal.");
+  }
 });
 
 client.on(Events.GuildMemberRemove, async (member) => {
+  if (!enableMemberLogs) {
+    return;
+  }
   console.log("[serverlog] member remove event", {
     guildId: member.guild.id,
     userId: member.user.id,
@@ -319,7 +333,7 @@ async function bootstrap() {
     commands: client.commands.size,
     guildId: process.env.DISCORD_GUILD_ID || null,
     supabaseConfigured: hasSupabaseConfig(),
-    guildMembersIntent: true
+    guildMembersIntent: enableMemberLogs
   });
   await client.login(token);
 }
