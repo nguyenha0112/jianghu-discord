@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { distributeFinalRewards, stopSession } = require("../services/vietnamese-king-service");
+const { buildAnswerReveal, distributeFinalRewards, stopSession } = require("../services/vietnamese-king-service");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,6 +29,7 @@ module.exports = {
           fields: [
             { name: "Tổng câu đã giải", value: String(session.moveCount), inline: true },
             { name: "Bảng điểm", value: scoreboard, inline: false },
+            { name: "Một vài đáp án", value: buildAnswerReveal(session), inline: false },
             { name: "Thưởng cuối ván", value: rewardResult.lines.join("\n"), inline: false }
           ]
         }

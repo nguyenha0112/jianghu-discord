@@ -267,6 +267,38 @@ function buildPuzzlePrompt(session) {
   ].join("\n");
 }
 
+function buildAnswerReveal(session, limit = 3) {
+  if (!session) {
+    return "Không có đáp án để hiển thị.";
+  }
+
+  const answers = [];
+  const seen = new Set();
+  const addAnswer = (puzzle) => {
+    const answer = normalizeText(puzzle?.answer || "");
+    if (!answer || seen.has(answer)) {
+      return;
+    }
+    seen.add(answer);
+    answers.push(answer);
+  };
+
+  addAnswer(session.currentPuzzle);
+  [...(session.usedPuzzleIds || [])]
+    .reverse()
+    .map((puzzleId) => puzzleBank.find((entry) => entry.id === puzzleId))
+    .forEach(addAnswer);
+
+  if (answers.length === 0) {
+    return "Không có đáp án để hiển thị.";
+  }
+
+  return answers
+    .slice(0, limit)
+    .map((answer, index) => `${index + 1}. **${answer}**`)
+    .join("\n");
+}
+
 function getPuzzleTypeLabel(type) {
   if (type === "proverb") {
     return "Tục ngữ / thành ngữ";
@@ -763,7 +795,15 @@ async function handleMessage(message) {
     const stoppedSession = stopSession(message.channel.id);
     const rewardResult = await distributeFinalRewards(stoppedSession);
     const topLine = buildScoreboardLines(stoppedSession.scores)[0] || "Chưa có ai ghi điểm.";
-    return { ok: true, skipReaction: true, reply: `Đã kết thúc ván Vua Tiếng Việt. Dẫn đầu: ${topLine}. ${rewardResult.lines.join(" ")}` };
+    return {
+      ok: true,
+      skipReaction: true,
+      reply: [
+        `Đã kết thúc ván Vua Tiếng Việt. Dẫn đầu: ${topLine}. ${rewardResult.lines.join(" ")}`,
+        "Một vài đáp án của ván này:",
+        buildAnswerReveal(stoppedSession)
+      ].join("\n")
+    };
   }
   if (START_KEYWORDS.has(lowered)) {
     return { ok: true, skipReaction: true, reply: "Ván hiện tại đang chạy rồi. Hãy đoán tiếp hoặc dùng `!stop` để kết thúc ván này." };
@@ -809,5 +849,6 @@ module.exports = {
   getHelpText,
   buildRoomGuideText,
   buildStatusEmbed,
+  buildAnswerReveal,
   distributeFinalRewards
 };

@@ -91,6 +91,9 @@ async function main() {
   if (!stopResult?.ok || !stopResult.reply.includes("Đã kết thúc")) {
     throw new Error("!stop không kết thúc ván");
   }
+  if (!stopResult.reply.includes("Một vài đáp án") || !stopResult.reply.includes(answer)) {
+    throw new Error("!stop không hiển thị đáp án mẫu");
+  }
 
   disableRoom(channelId);
   console.log(
