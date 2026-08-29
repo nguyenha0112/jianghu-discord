@@ -9,6 +9,9 @@ const { hydrateRooms: hydrateBauCuaRooms } = require("./storage/baucua-room-stor
 const { hydrateRooms: hydrateVietnameseKingRooms } = require("./storage/vietnamese-king-room-store");
 const { hydrateRooms: hydrateXiDachRooms } = require("./storage/xidach-room-store");
 const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-store");
+const { hydrateRooms: hydrateServerLogRooms } = require("./storage/serverlog-room-store");
+const { announceMemberLeave } = require("./lib/serverlog-announcer");
+const { hasSupabaseConfig } = require("./lib/supabase");
 const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
 const {
   handleMessage: handleTaiXiuMessage,
@@ -93,7 +96,12 @@ process.on("SIGTERM", () => {
 });
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
 client.commands = new Collection();
@@ -114,6 +122,21 @@ logStartup("commands loaded", { count: client.commands.size });
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
+});
+
+client.on(Events.GuildMemberRemove, async (member) => {
+  console.log("[serverlog] member remove event", {
+    guildId: member.guild.id,
+    userId: member.user.id,
+    username: member.user.username
+  });
+  await announceMemberLeave(member).catch((error) => {
+    console.error("[serverlog] member leave handler failed", {
+      guildId: member.guild.id,
+      userId: member.user.id,
+      message: error.message
+    });
+  });
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -287,14 +310,16 @@ async function bootstrap() {
     hydrateBauCuaRooms(),
     hydrateVietnameseKingRooms(),
     hydrateXiDachRooms(),
-    hydrateLevelUpRooms()
+    hydrateLevelUpRooms(),
+    hydrateServerLogRooms()
   ]);
   logStartup("room config hydrated");
 
   logStartup("logging in Discord", {
     commands: client.commands.size,
     guildId: process.env.DISCORD_GUILD_ID || null,
-    supabase: Boolean(process.env.SUPABASE_URL)
+    supabaseConfigured: hasSupabaseConfig(),
+    guildMembersIntent: true
   });
   await client.login(token);
 }

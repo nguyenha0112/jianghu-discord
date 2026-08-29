@@ -8,6 +8,7 @@ const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_SECRET_KEY ||
   process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseFetchTimeoutMs = Math.max(1000, Number(process.env.SUPABASE_FETCH_TIMEOUT_MS || 6000));
 
 function hasSupabaseConfig() {
   return Boolean(supabaseUrl && supabaseKey);
@@ -25,7 +26,14 @@ function getSupabaseClient() {
       detectSessionInUrl: false
     },
     global: {
-      fetch: fetch.bind(globalThis)
+      fetch: (url, options = {}) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), supabaseFetchTimeoutMs);
+        return fetch(url, {
+          ...options,
+          signal: options.signal || controller.signal
+        }).finally(() => clearTimeout(timeout));
+      }
     },
     realtime: {
       transport: WebSocket
