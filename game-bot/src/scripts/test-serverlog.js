@@ -31,8 +31,11 @@ function main() {
   if (!embed.description?.includes(member.user.id)) {
     throw new Error("Serverlog leave embed does not mention user");
   }
-  if (!embed.fields?.some((field) => field.name === "Role trước khi rời" && field.value.includes("role-a"))) {
+  if (!embed.fields?.some((field) => field.name.includes("Role trước khi rời") && field.value.includes("role-a"))) {
     throw new Error("Serverlog leave embed does not include previous roles");
+  }
+  if (!embed.thumbnail?.url || !embed.footer?.text?.includes("Jianghu Server Log")) {
+    throw new Error("Serverlog leave embed is missing visual metadata");
   }
 
   console.log(JSON.stringify({ ok: true, title: embed.title, fields: embed.fields.length }, null, 2));
