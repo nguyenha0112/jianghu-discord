@@ -1,8 +1,7 @@
 require("dotenv").config();
 
-const fs = require("node:fs");
-const path = require("node:path");
 const { REST, Routes } = require("discord.js");
+const { commandData } = require("./shared/command-registry");
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -15,18 +14,7 @@ if (!token || !clientId || !guildId) {
 
 const rest = new REST({ version: "10" }).setToken(token);
 
-function loadCommandData() {
-  const commandsPath = path.join(__dirname, "commands");
-  const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith(".js"));
-
-  return commandFiles
-    .map((file) => require(path.join(commandsPath, file)))
-    .filter((command) => command?.data?.toJSON)
-    .map((command) => command.data.toJSON());
-}
-
 async function main() {
-  const commandData = loadCommandData();
   console.log(`Dang dang ky ${commandData.length} guild commands...`);
   await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
     body: commandData

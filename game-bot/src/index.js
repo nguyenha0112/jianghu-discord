@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
+const { Client, Collection, Events, GatewayIntentBits, REST, Routes } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
 const { hydrateRooms: hydrateWordChainRooms } = require("./storage/word-chain-room-store");
@@ -12,6 +12,7 @@ const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-st
 const { hydrateRooms: hydrateServerLogRooms } = require("./storage/serverlog-room-store");
 const { announceMemberLeave } = require("./lib/serverlog-announcer");
 const { hasSupabaseConfig } = require("./lib/supabase");
+const { commandData } = require("./shared/command-registry");
 const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
 const {
   handleMessage: handleTaiXiuMessage,
@@ -31,6 +32,8 @@ const {
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 
 const token = process.env.DISCORD_TOKEN;
+const clientId = process.env.DISCORD_CLIENT_ID;
+const guildId = process.env.DISCORD_GUILD_ID;
 const enableMemberLogs = ["1", "true", "yes", "on"].includes(
   String(process.env.DISCORD_ENABLE_MEMBER_LOGS || "").toLowerCase()
 );
@@ -44,6 +47,23 @@ function logStartup(message, meta = {}) {
 if (!token) {
   console.error("Thieu DISCORD_TOKEN trong game-bot/.env");
   process.exit(1);
+}
+
+async function syncGuildCommands() {
+  if (!clientId || !guildId) {
+    console.warn("[startup] skip command sync: missing DISCORD_CLIENT_ID or DISCORD_GUILD_ID");
+    return;
+  }
+
+  const rest = new REST({ version: "10" }).setToken(token);
+  await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+    body: commandData
+  });
+  logStartup("guild commands synced", {
+    guildId,
+    count: commandData.length,
+    commands: commandData.map((command) => command.name)
+  });
 }
 
 function ensureSingleInstance() {
@@ -328,6 +348,7 @@ async function bootstrap() {
     hydrateServerLogRooms()
   ]);
   logStartup("room config hydrated");
+  await syncGuildCommands();
 
   logStartup("logging in Discord", {
     commands: client.commands.size,

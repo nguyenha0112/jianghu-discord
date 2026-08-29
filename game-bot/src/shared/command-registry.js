@@ -146,22 +146,6 @@ const commandBuilders = [
         .setRequired(false)
     ),
   new SlashCommandBuilder()
-    .setName("noitu-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại thành phòng chơi Nối Từ.")
-    .addStringOption((option) =>
-      option
-        .setName("che_do")
-        .setDescription("Chọn chế độ chơi cho phòng này")
-        .setRequired(true)
-        .addChoices(
-          { name: "PvP", value: "pvp" },
-          { name: "PvE", value: "pve" }
-        )
-    ),
-  new SlashCommandBuilder()
-    .setName("noitu-xoa-phong")
-    .setDescription("Gỡ cấu hình phòng chơi Nối Từ khỏi kênh hiện tại."),
-  new SlashCommandBuilder()
     .setName("noitu-tao")
     .setDescription("Mở ván Nối Từ bằng slash command nếu cần.")
     .addStringOption((option) =>
@@ -177,50 +161,14 @@ const commandBuilders = [
     .setName("noitu-dung")
     .setDescription("Kết thúc ván Nối Từ hiện tại."),
   new SlashCommandBuilder()
-    .setName("vuatiengviet-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại thành phòng Vua Tiếng Việt."),
-  new SlashCommandBuilder()
-    .setName("vuatiengviet-xoa-phong")
-    .setDescription("Gỡ cấu hình phòng Vua Tiếng Việt khỏi kênh hiện tại."),
-  new SlashCommandBuilder()
     .setName("vuatiengviet-trangthai")
     .setDescription("Xem trạng thái ván Vua Tiếng Việt hiện tại."),
   new SlashCommandBuilder()
     .setName("vuatiengviet-dung")
     .setDescription("Kết thúc ván Vua Tiếng Việt hiện tại."),
   new SlashCommandBuilder()
-    .setName("taixiu-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại thành phòng Tài Xỉu."),
-  new SlashCommandBuilder()
-    .setName("taixiu-xoa-phong")
-    .setDescription("Gỡ cấu hình phòng Tài Xỉu khỏi kênh hiện tại."),
-  new SlashCommandBuilder()
     .setName("taixiu-trangthai")
     .setDescription("Xem trạng thái kèo Tài Xỉu hiện tại."),
-  new SlashCommandBuilder()
-    .setName("baucua-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại thành phòng Bầu Cua."),
-  new SlashCommandBuilder()
-    .setName("baucua-xoa-phong")
-    .setDescription("Gỡ cấu hình phòng Bầu Cua khỏi kênh hiện tại."),
-  new SlashCommandBuilder()
-    .setName("xidach-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại thành phòng Xì Dách."),
-  new SlashCommandBuilder()
-    .setName("xidach-xoa-phong")
-    .setDescription("Gỡ cấu hình phòng Xì Dách khỏi kênh hiện tại."),
-  new SlashCommandBuilder()
-    .setName("levelup-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại thành phòng thông báo khi người chơi lên cấp."),
-  new SlashCommandBuilder()
-    .setName("levelup-xoa-phong")
-    .setDescription("Tắt phòng thông báo level-up của máy chủ."),
-  new SlashCommandBuilder()
-    .setName("serverlog-tao-phong")
-    .setDescription("Thiết lập kênh hiện tại làm phòng thông báo người rời server."),
-  new SlashCommandBuilder()
-    .setName("serverlog-xoa-phong")
-    .setDescription("Tắt phòng thông báo người rời server."),
   new SlashCommandBuilder()
     .setName("admin-player")
     .setDescription("Xem thông tin chi tiết của một player.")
