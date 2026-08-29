@@ -4,6 +4,14 @@ const supabaseRoomStore = require("./supabase-room-store");
 
 const dataDir = path.join(__dirname, "..", "..", "data");
 
+function describeError(error) {
+  return {
+    name: error?.name,
+    message: error?.message,
+    cause: error?.cause?.message || error?.cause?.code || null
+  };
+}
+
 function createRoomStore({ gameKey, fileName, defaults = {} }) {
   const dataFile = path.join(dataDir, fileName);
   let cache = null;
@@ -54,7 +62,7 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
       return rooms;
     } catch (error) {
       cache = store;
-      console.error(`[room-store:${gameKey}] Supabase hydrate loi, fallback ve JSON:`, error.message);
+      console.error(`[room-store:${gameKey}] Supabase hydrate loi, fallback ve JSON:`, describeError(error));
       return store.rooms;
     }
   }
@@ -68,18 +76,39 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
     };
   }
 
-  function enableRoom(channelId, config) {
+  function saveRoomLocally(channelId, config) {
     const store = ensureCache();
     store.rooms[channelId] = buildRoomPayload(config);
     persistCache();
+    return store.rooms[channelId];
+  }
+
+  function enableRoom(channelId, config) {
+    const room = saveRoomLocally(channelId, config);
 
     if (supabaseRoomStore.hasSupabaseConfig()) {
-      supabaseRoomStore.upsertRoom(gameKey, channelId, store.rooms[channelId]).catch((error) => {
-        console.error(`[room-store:${gameKey}] Khong the luu phong len Supabase:`, error.message);
+      supabaseRoomStore.upsertRoom(gameKey, channelId, room).catch((error) => {
+        console.error(`[room-store:${gameKey}] Khong the luu phong len Supabase:`, describeError(error));
       });
     }
 
-    return store.rooms[channelId];
+    return room;
+  }
+
+  async function enableRoomPersistent(channelId, config) {
+    const room = saveRoomLocally(channelId, config);
+
+    if (!supabaseRoomStore.hasSupabaseConfig()) {
+      return { room, persisted: false, reason: "Supabase chưa được cấu hình." };
+    }
+
+    try {
+      await supabaseRoomStore.upsertRoom(gameKey, channelId, room);
+      return { room, persisted: true, reason: null };
+    } catch (error) {
+      console.error(`[room-store:${gameKey}] Khong the luu phong len Supabase:`, describeError(error));
+      return { room, persisted: false, reason: error?.cause?.message || error?.message || "Không rõ lỗi Supabase." };
+    }
   }
 
   function disableRoom(channelId) {
@@ -89,7 +118,7 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
 
     if (supabaseRoomStore.hasSupabaseConfig()) {
       supabaseRoomStore.deleteRoom(gameKey, channelId).catch((error) => {
-        console.error(`[room-store:${gameKey}] Khong the xoa phong tren Supabase:`, error.message);
+        console.error(`[room-store:${gameKey}] Khong the xoa phong tren Supabase:`, describeError(error));
       });
     }
   }
@@ -106,6 +135,7 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
   return {
     hydrateRooms,
     enableRoom,
+    enableRoomPersistent,
     disableRoom,
     getRoom,
     isEnabledRoom

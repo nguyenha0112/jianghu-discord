@@ -5,8 +5,14 @@ const { enableRoom: enableVietnameseKingRoom, disableRoom: disableVietnameseKing
 const { enableRoom: enableTaiXiuRoom, disableRoom: disableTaiXiuRoom } = require("../storage/taixiu-room-store");
 const { enableRoom: enableBauCuaRoom, disableRoom: disableBauCuaRoom } = require("../storage/baucua-room-store");
 const { enableRoom: enableXiDachRoom, disableRoom: disableXiDachRoom } = require("../storage/xidach-room-store");
-const { enableRoom: enableLevelUpRoom, disableRoom: disableLevelUpRoom } = require("../storage/levelup-room-store");
-const { enableRoom: enableServerLogRoom, disableRoom: disableServerLogRoom } = require("../storage/serverlog-room-store");
+const {
+  enableRoomPersistent: enableLevelUpRoomPersistent,
+  disableRoom: disableLevelUpRoom
+} = require("../storage/levelup-room-store");
+const {
+  enableRoomPersistent: enableServerLogRoomPersistent,
+  disableRoom: disableServerLogRoom
+} = require("../storage/serverlog-room-store");
 
 function roomMeta(interaction) {
   return {
@@ -137,8 +143,12 @@ module.exports = {
       }
 
       if (action === "levelup_tao") {
-        enableLevelUpRoom(interaction.guildId, meta);
-        await interaction.editReply(`Đã đặt <#${interaction.channelId}> làm phòng thông báo lên cấp.`);
+        const result = await enableLevelUpRoomPersistent(interaction.guildId, meta);
+        await interaction.editReply(
+          result.persisted
+            ? `Đã đặt <#${interaction.channelId}> làm phòng thông báo lên cấp và đã lưu Supabase.`
+            : `Đã bật tạm <#${interaction.channelId}> làm phòng thông báo lên cấp, nhưng chưa lưu được Supabase: ${result.reason}`
+        );
         return;
       }
 
@@ -149,8 +159,12 @@ module.exports = {
       }
 
       if (action === "serverlog_tao") {
-        enableServerLogRoom(interaction.guildId, meta);
-        await interaction.editReply(`Đã đặt <#${interaction.channelId}> làm phòng log người rời server.`);
+        const result = await enableServerLogRoomPersistent(interaction.guildId, meta);
+        await interaction.editReply(
+          result.persisted
+            ? `Đã đặt <#${interaction.channelId}> làm phòng log người rời server và đã lưu Supabase.`
+            : `Đã bật tạm <#${interaction.channelId}> làm phòng log người rời server, nhưng chưa lưu được Supabase: ${result.reason}`
+        );
         return;
       }
 
