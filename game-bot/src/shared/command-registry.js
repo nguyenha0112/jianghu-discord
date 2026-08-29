@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
+const adminCommand = require("../commands/admin");
 
 const commandBuilders = [
+  adminCommand.data,
   new SlashCommandBuilder()
     .setName("ping")
     .setDescription("Kiểm tra bot có đang online không."),
@@ -195,6 +197,30 @@ const commandBuilders = [
   new SlashCommandBuilder()
     .setName("taixiu-trangthai")
     .setDescription("Xem trạng thái kèo Tài Xỉu hiện tại."),
+  new SlashCommandBuilder()
+    .setName("baucua-tao-phong")
+    .setDescription("Thiết lập kênh hiện tại thành phòng Bầu Cua."),
+  new SlashCommandBuilder()
+    .setName("baucua-xoa-phong")
+    .setDescription("Gỡ cấu hình phòng Bầu Cua khỏi kênh hiện tại."),
+  new SlashCommandBuilder()
+    .setName("xidach-tao-phong")
+    .setDescription("Thiết lập kênh hiện tại thành phòng Xì Dách."),
+  new SlashCommandBuilder()
+    .setName("xidach-xoa-phong")
+    .setDescription("Gỡ cấu hình phòng Xì Dách khỏi kênh hiện tại."),
+  new SlashCommandBuilder()
+    .setName("levelup-tao-phong")
+    .setDescription("Thiết lập kênh hiện tại thành phòng thông báo khi người chơi lên cấp."),
+  new SlashCommandBuilder()
+    .setName("levelup-xoa-phong")
+    .setDescription("Tắt phòng thông báo level-up của máy chủ."),
+  new SlashCommandBuilder()
+    .setName("serverlog-tao-phong")
+    .setDescription("Thiết lập kênh hiện tại làm phòng thông báo người rời server."),
+  new SlashCommandBuilder()
+    .setName("serverlog-xoa-phong")
+    .setDescription("Tắt phòng thông báo người rời server."),
   new SlashCommandBuilder()
     .setName("admin-player")
     .setDescription("Xem thông tin chi tiết của một player.")
