@@ -31,6 +31,8 @@ const TTS_HOSTS = (process.env.TTS_HOSTS || "https://translate.google.com,https:
   .map((host) => host.trim())
   .filter(Boolean);
 const TTS_SPEED = Math.min(2, Math.max(0.5, Number(process.env.TTS_SPEED || 1.2)));
+const MAX_TTS_CHUNK_LENGTH = Math.max(80, Number(process.env.TTS_CHUNK_LENGTH || 170));
+const MAX_TTS_QUEUE_ITEMS = Math.max(3, Number(process.env.TTS_QUEUE_ITEMS || 12));
 
 if (!TOKEN) {
   console.error("[chat-bot] Missing DISCORD_TOKEN in env");
@@ -52,7 +54,7 @@ const CHAT_COMMANDS = [
         .setName("noi_dung")
         .setDescription("Nội dung muốn bot đọc")
         .setRequired(true)
-        .setMaxLength(180)
+        .setMaxLength(1000)
     ),
   new SlashCommandBuilder()
     .setName("chatbot-trangthai")
@@ -122,6 +124,57 @@ function getState(guildId) {
   return guildStates.get(guildId);
 }
 
+function splitTextForTTS(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const chunks = [];
+  const sentences = normalized.match(/[^.!?。！？\n]+[.!?。！？]*/gu) || [normalized];
+
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (trimmed.length <= MAX_TTS_CHUNK_LENGTH) {
+      chunks.push(trimmed);
+      continue;
+    }
+
+    let current = "";
+    for (const word of trimmed.split(" ")) {
+      if (!word) {
+        continue;
+      }
+      const next = current ? `${current} ${word}` : word;
+      if (next.length <= MAX_TTS_CHUNK_LENGTH) {
+        current = next;
+        continue;
+      }
+      if (current) {
+        chunks.push(current);
+      }
+      current = word.length > MAX_TTS_CHUNK_LENGTH ? word.slice(0, MAX_TTS_CHUNK_LENGTH) : word;
+    }
+    if (current) {
+      chunks.push(current);
+    }
+  }
+
+  return chunks;
+}
+
+function resetPlaybackState(guildId, reason = "manual reset") {
+  const state = getState(guildId);
+  state.queue = [];
+  state.playing = false;
+  state.player.stop(true);
+  log("playback reset", { guildId, reason });
+}
+
 async function registerSlashCommands() {
   if (!CLIENT_ID || !GUILD_ID) {
     log("slash register skipped: missing DISCORD_CLIENT_ID or DISCORD_GUILD_ID", {
@@ -185,12 +238,26 @@ async function createResourceFromTTS(text) {
 
 async function enqueueAndPlay(guildId, text) {
   const state = getState(guildId);
-  state.queue.push(text.slice(0, 180));
-  log("queued tts", { guildId, queueLength: state.queue.length });
+  const chunks = splitTextForTTS(text);
+  if (chunks.length === 0) {
+    return 0;
+  }
+
+  state.queue.push(...chunks);
+  if (state.queue.length > MAX_TTS_QUEUE_ITEMS) {
+    state.queue = state.queue.slice(-MAX_TTS_QUEUE_ITEMS);
+  }
+  log("queued tts", {
+    guildId,
+    chunks: chunks.length,
+    queueLength: state.queue.length
+  });
 
   if (state.player.state.status === AudioPlayerStatus.Idle && !state.playing) {
     await playNext(guildId);
   }
+
+  return chunks.length;
 }
 
 async function playNext(guildId) {
@@ -220,6 +287,11 @@ async function joinForContext({ guild, member, channel, user }) {
     return { ok: false, message: "Bạn cần vào voice channel trước rồi hãy dùng `/join`." };
   }
 
+  const previousConnection = getVoiceConnection(guild.id);
+  if (previousConnection) {
+    previousConnection.destroy();
+  }
+
   const connection = joinVoiceChannel({
     channelId: voiceChannel.id,
     guildId: guild.id,
@@ -227,6 +299,7 @@ async function joinForContext({ guild, member, channel, user }) {
     selfDeaf: false
   });
   const state = getState(guild.id);
+  resetPlaybackState(guild.id, "new join");
   state.connection = connection;
   state.textChannelId = channel.id;
   connection.subscribe(state.player);
@@ -251,8 +324,7 @@ function leaveGuild(guildId) {
     connection.destroy();
   }
 
-  state.queue = [];
-  state.playing = false;
+  resetPlaybackState(guildId, "leave");
   state.connection = null;
   state.textChannelId = null;
   log("left voice", { guildId });
@@ -309,8 +381,8 @@ async function handleChatInputCommand(interaction) {
       await interaction.reply({ content: "Bot chưa vào voice. Dùng `/join` trước.", ephemeral: true });
       return;
     }
-    await enqueueAndPlay(interaction.guildId, text);
-    await interaction.reply({ content: "Đã thêm vào hàng chờ đọc.", ephemeral: true });
+    const chunkCount = await enqueueAndPlay(interaction.guildId, text);
+    await interaction.reply({ content: `Đã thêm vào hàng chờ đọc${chunkCount > 1 ? ` (${chunkCount} đoạn)` : ""}.`, ephemeral: true });
     return;
   }
 
@@ -349,7 +421,10 @@ async function handleTextCommand(message, cmd, args) {
       return true;
     }
 
-    await enqueueAndPlay(message.guild.id, args);
+    const chunkCount = await enqueueAndPlay(message.guild.id, args);
+    if (chunkCount > 1) {
+      await message.reply(`Tin nhắn dài, bot sẽ đọc thành ${chunkCount} đoạn.`).catch(() => {});
+    }
     await message.react("🔊").catch(() => {});
     return true;
   }
@@ -412,6 +487,28 @@ client.on(Events.MessageCreate, async (message) => {
 
     const authorName = message.member?.displayName || message.author.username;
     await enqueueAndPlay(message.guild.id, `${authorName} nói: ${content}`);
+  }
+});
+
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+  if (oldState.member?.id !== client.user?.id || oldState.channelId === newState.channelId) {
+    return;
+  }
+
+  if (newState.channelId) {
+    return;
+  }
+
+  const previousState = guildStates.get(oldState.guild.id);
+  const textChannelId = previousState?.textChannelId;
+  resetPlaybackState(oldState.guild.id, "voice disconnected");
+  const state = getState(oldState.guild.id);
+  state.connection = null;
+  state.textChannelId = null;
+
+  if (textChannelId) {
+    const channel = await oldState.client.channels.fetch(textChannelId).catch(() => null);
+    await channel?.send?.("Bot đã rời voice và đã dọn hàng chờ đọc. Dùng `/join` để gọi lại.").catch(() => {});
   }
 });
 
