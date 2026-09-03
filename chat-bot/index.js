@@ -34,11 +34,6 @@ const TTS_SPEED = Math.min(2, Math.max(0.5, Number(process.env.TTS_SPEED || 1.2)
 const MAX_TTS_CHUNK_LENGTH = Math.max(80, Number(process.env.TTS_CHUNK_LENGTH || 170));
 const MAX_TTS_QUEUE_ITEMS = Math.max(3, Number(process.env.TTS_QUEUE_ITEMS || 12));
 
-if (!TOKEN) {
-  console.error("[chat-bot] Missing DISCORD_TOKEN in env");
-  process.exit(1);
-}
-
 const CHAT_COMMANDS = [
   new SlashCommandBuilder()
     .setName("join")
@@ -100,6 +95,7 @@ function getState(guildId) {
       player,
       queue: [],
       textChannelId: null,
+      voiceChannelId: null,
       playing: false
     };
 
@@ -173,6 +169,10 @@ function resetPlaybackState(guildId, reason = "manual reset") {
   state.playing = false;
   state.player.stop(true);
   log("playback reset", { guildId, reason });
+}
+
+function shouldReplyUnknownTextCommand(cmd) {
+  return Boolean(cmd?.startsWith("chatbot"));
 }
 
 async function registerSlashCommands() {
@@ -302,6 +302,7 @@ async function joinForContext({ guild, member, channel, user }) {
   resetPlaybackState(guild.id, "new join");
   state.connection = connection;
   state.textChannelId = channel.id;
+  state.voiceChannelId = voiceChannel.id;
   connection.subscribe(state.player);
 
   log("joined voice", {
@@ -327,6 +328,7 @@ function leaveGuild(guildId) {
   resetPlaybackState(guildId, "leave");
   state.connection = null;
   state.textChannelId = null;
+  state.voiceChannelId = null;
   log("left voice", { guildId });
 }
 
@@ -338,6 +340,7 @@ function buildStatusText(guildId) {
 
   return [
     "Bot đang hoạt động.",
+    `Voice đang ở: <#${state.voiceChannelId}>`,
     `Kênh text đang đọc: <#${state.textChannelId}>`,
     `Queue hiện tại: ${state.queue.length} câu`,
     `Trạng thái phát: ${state.player.state.status}`
@@ -472,7 +475,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.content.startsWith(PREFIX)) {
     const [cmd, ...rest] = message.content.slice(PREFIX.length).trim().split(/\s+/);
     const handled = await handleTextCommand(message, cmd, rest.join(" "));
-    if (!handled && cmd?.startsWith("chatbot")) {
+    if (!handled && shouldReplyUnknownTextCommand(cmd)) {
       await message.reply("Lệnh chatbot chưa đúng. Dùng `/join`, `/leave`, `/tts`, `/chatbot-trangthai`.");
     }
     return;
@@ -500,11 +503,21 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   }
 
   const previousState = guildStates.get(oldState.guild.id);
+  if (previousState?.voiceChannelId && previousState.voiceChannelId !== oldState.channelId) {
+    log("ignored stale voice disconnect", {
+      guildId: oldState.guild.id,
+      oldVoiceChannelId: oldState.channelId,
+      activeVoiceChannelId: previousState.voiceChannelId
+    });
+    return;
+  }
+
   const textChannelId = previousState?.textChannelId;
   resetPlaybackState(oldState.guild.id, "voice disconnected");
   const state = getState(oldState.guild.id);
   state.connection = null;
   state.textChannelId = null;
+  state.voiceChannelId = null;
 
   if (textChannelId) {
     const channel = await oldState.client.channels.fetch(textChannelId).catch(() => null);
@@ -513,6 +526,11 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 });
 
 async function bootstrap() {
+  if (!TOKEN) {
+    console.error("[chat-bot] Missing DISCORD_TOKEN in env");
+    process.exit(1);
+  }
+
   assertVoiceRuntime();
   await registerSlashCommands().catch((error) => {
     log("slash register failed", { message: error.message });
@@ -520,7 +538,14 @@ async function bootstrap() {
   await client.login(TOKEN);
 }
 
-bootstrap().catch((error) => {
-  log("startup failed", { message: error.message });
-  process.exit(1);
-});
+if (require.main === module) {
+  bootstrap().catch((error) => {
+    log("startup failed", { message: error.message });
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  splitTextForTTS,
+  shouldReplyUnknownTextCommand
+};

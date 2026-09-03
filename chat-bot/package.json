@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js"
+    "check": "node --check index.js",
+    "flow:test": "node test-chatbot-flow.js"
   },
   "author": "",
   "license": "MIT",
