@@ -74,6 +74,11 @@ async function runPvpFlow() {
   }
 
   const sessionAfterStart = getSessionStatus(channelId);
+  const invalidResult = await handleWordChainMessage(createMessage(channel, "guild-1", "ok r", "u2", "Bob"));
+  if (invalidResult?.reply || invalidResult?.silent !== true || invalidResult?.react !== "failure") {
+    throw new Error("PvP unknown phrase should only react X without replying");
+  }
+
   const validReply = findPlayablePhraseForToken(sessionAfterStart.requiredToken, "guild-1", [sessionAfterStart.currentPhrase]);
   if (!validReply) {
     throw new Error("PvP could not find a valid reply");
@@ -113,6 +118,11 @@ async function runPveFlow() {
   }
 
   const sessionAfterStart = getSessionStatus(channelId);
+  const invalidResult = await handleWordChainMessage(createMessage(channel, "guild-2", "ok r", "u3", "Carol"));
+  if (invalidResult?.reply || invalidResult?.silent !== true || invalidResult?.react !== "failure") {
+    throw new Error("PvE unknown phrase should only react X without replying");
+  }
+
   const validReply = findPlayablePhraseForToken(sessionAfterStart.requiredToken, "guild-2", [sessionAfterStart.currentPhrase]);
   if (!validReply) {
     throw new Error("PvE could not find a valid reply");

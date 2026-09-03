@@ -1008,6 +1008,7 @@ async function processPvpPhrase({ guildId, channel, userId, username, phrase }) 
   if (!validation.ok) {
     if (validation.reason === "not_meaningful") {
       trackUnknownPhrase({ guildId, channelId: channel.id, username }, phrase);
+      return { ok: false, react: "failure", silent: true };
     }
     return { ok: false, react: "failure", silent: false, reply: validation.reply };
   }
@@ -1039,6 +1040,7 @@ async function processPvePhrase({ guildId, channel, userId, username, phrase }) 
   if (!validation.ok) {
     if (validation.reason === "not_meaningful") {
       trackUnknownPhrase({ guildId, channelId: channel.id, username }, phrase);
+      return { ok: false, react: "failure", silent: true };
     }
     return { ok: false, silent: validation.reason !== "used_recently", reply: validation.reply };
   }
