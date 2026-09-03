@@ -472,7 +472,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.content.startsWith(PREFIX)) {
     const [cmd, ...rest] = message.content.slice(PREFIX.length).trim().split(/\s+/);
     const handled = await handleTextCommand(message, cmd, rest.join(" "));
-    if (!handled) {
+    if (!handled && cmd?.startsWith("chatbot")) {
       await message.reply("Lệnh chatbot chưa đúng. Dùng `/join`, `/leave`, `/tts`, `/chatbot-trangthai`.");
     }
     return;
