@@ -8,7 +8,7 @@ function buildMemberLeaveEmbed(member) {
   const leftAt = Math.floor(Date.now() / 1000);
   const roleValues = member.roles?.cache?.values ? [...member.roles.cache.values()] : [];
   const roles = roleValues
-    .filter((role) => role.id !== member.guild.id)
+    .filter((role) => role && role.id !== member.guild.id)
     .sort((left, right) => right.position - left.position)
     .map((role) => `<@&${role.id}>`)
     .slice(0, 12);
@@ -72,14 +72,17 @@ async function announceMemberLeave(member) {
     return false;
   }
 
-  await channel.send({ embeds: [buildMemberLeaveEmbed(member)] }).catch((error) => {
+  try {
+    await channel.send({ embeds: [buildMemberLeaveEmbed(member)], allowedMentions: { parse: [] } });
+  } catch (error) {
     console.error("[serverlog] failed to send member leave log", {
       guildId: member.guild.id,
       channelId: room.channelId,
       userId: member.user.id,
       message: error.message
     });
-  });
+    return false;
+  }
 
   console.log("[serverlog] member leave sent", {
     guildId: member.guild.id,

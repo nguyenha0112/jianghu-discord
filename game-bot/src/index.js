@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const { Client, Collection, Events, GatewayIntentBits, REST, Routes } = require("discord.js");
+const { Client, Collection, Events, GatewayIntentBits, Partials, REST, Routes } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
 const { hydrateRooms: hydrateWordChainRooms } = require("./storage/word-chain-room-store");
@@ -129,7 +129,8 @@ if (enableMemberLogs) {
 }
 
 const client = new Client({
-  intents: clientIntents
+  intents: clientIntents,
+  partials: [Partials.GuildMember]
 });
 
 client.commands = new Collection();
