@@ -12,13 +12,13 @@ function buildMemberLeaveEmbed(member) {
     .sort((left, right) => right.position - left.position)
     .map((role) => `<@&${role.id}>`)
     .slice(0, 12);
-  const displayName = member.displayName || user.globalName || user.username || "Không rõ";
+  const displayName = member.nickname || member.displayName || user.globalName || user.username || "Không rõ";
   const avatarUrl = user.displayAvatarURL?.({ size: 256 }) || undefined;
 
   const embed = new EmbedBuilder()
     .setColor(0xff6b6b)
     .setAuthor({
-      name: user.tag || user.username,
+      name: displayName,
       iconURL: avatarUrl
     })
     .setTitle("🚪 Thành viên đã rời server")
@@ -27,6 +27,7 @@ function buildMemberLeaveEmbed(member) {
       `Mention: <@${user.id}>`
     ].join("\n"))
     .addFields(
+      { name: "Tên Discord", value: user.username || "Không rõ", inline: true },
       { name: "🆔 User ID", value: user.id, inline: true },
       { name: "⏳ Đã vào server", value: joinedAt ? `<t:${joinedAt}:R>` : "Không rõ", inline: true },
       { name: "🕰️ Rời lúc", value: `<t:${leftAt}:F>`, inline: true },

@@ -8,6 +8,7 @@ function fakeRole(id, position) {
 
 function main() {
   const member = {
+    nickname: "Lục Hà",
     guild: { id: "guild-test", name: "Jianghu Test" },
     user: {
       id: "123456789012345678",
@@ -27,6 +28,9 @@ function main() {
   };
 
   const embed = buildMemberLeaveEmbed(member).toJSON();
+  assert.equal(embed.author.name, "Lục Hà");
+  assert.ok(embed.description.includes("Lục Hà"));
+  assert.ok(embed.fields.some((field) => field.name === "Tên Discord" && field.value === "Tester"));
   if (!embed.title?.includes("rời server")) {
     throw new Error("Serverlog leave embed title is wrong");
   }
