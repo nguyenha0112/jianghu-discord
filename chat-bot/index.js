@@ -163,6 +163,21 @@ function splitTextForTTS(text) {
   return chunks;
 }
 
+function sanitizeTextForTTS(text) {
+  return String(text || "")
+    .replace(/<a?:[A-Za-z0-9_~]+:\d+>/g, " ")
+    .replace(/:[A-Za-z0-9_~]+:/g, " ")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/<[@#&]!?(\d+)>/g, " ")
+    .replace(/<t:\d+(?::[tTdDfFR])?>/g, " ")
+    .replace(/[#*0-9]\uFE0F?\u20E3/gu, " ")
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, " ")
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]/gu, " ")
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function resetPlaybackState(guildId, reason = "manual reset") {
   const state = getState(guildId);
   state.queue = [];
@@ -483,7 +498,7 @@ client.on(Events.MessageCreate, async (message) => {
 
   const state = guildStates.get(message.guild.id);
   if (state?.connection && state.textChannelId === message.channel.id) {
-    const content = message.content.trim();
+    const content = sanitizeTextForTTS(message.cleanContent || message.content);
     if (!content) {
       return;
     }
@@ -546,6 +561,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  sanitizeTextForTTS,
   splitTextForTTS,
   shouldReplyUnknownTextCommand
 };
