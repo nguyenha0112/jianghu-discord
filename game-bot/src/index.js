@@ -11,7 +11,7 @@ const { hydrateRooms: hydrateXiDachRooms } = require("./storage/xidach-room-stor
 const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-store");
 const { hydrateRooms: hydrateServerLogRooms } = require("./storage/serverlog-room-store");
 const { announceMemberLeave } = require("./lib/serverlog-announcer");
-const { hasSupabaseConfig } = require("./lib/supabase");
+const { getSupabaseClient, hasSupabaseConfig } = require("./lib/supabase");
 const { commandData } = require("./shared/command-registry");
 const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
 const {
@@ -42,6 +42,35 @@ const lockFile = path.join(runtimeDir, "bot.lock");
 
 function logStartup(message, meta = {}) {
   console.log(`[startup] ${message}`, meta);
+}
+
+let supabaseReady = false;
+
+function sendHealthHeartbeat() {
+  if (typeof process.send === "function") {
+    process.send({
+      type: "bot-health",
+      service: "game-bot",
+      discordReady: client.isReady(),
+      supabaseReady
+    });
+  }
+}
+
+async function checkSupabaseHealth() {
+  if (!hasSupabaseConfig()) {
+    supabaseReady = false;
+    sendHealthHeartbeat();
+    return false;
+  }
+  try {
+    const { error } = await getSupabaseClient().from("players").select("user_id", { head: true, count: "exact" });
+    supabaseReady = !error;
+  } catch (error) {
+    supabaseReady = false;
+  }
+  sendHealthHeartbeat();
+  return supabaseReady;
 }
 
 if (!token) {
@@ -151,10 +180,14 @@ logStartup("commands loaded", { count: client.commands.size });
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
+  checkSupabaseHealth().catch(() => {});
   if (!enableMemberLogs) {
     console.warn("[serverlog] member leave logs disabled. Set DISCORD_ENABLE_MEMBER_LOGS=true after enabling SERVER MEMBERS INTENT in Discord Developer Portal.");
   }
 });
+
+setInterval(sendHealthHeartbeat, 20000).unref();
+setInterval(() => checkSupabaseHealth().catch(() => {}), 60000).unref();
 
 client.on(Events.GuildMemberRemove, async (member) => {
   if (!enableMemberLogs) {

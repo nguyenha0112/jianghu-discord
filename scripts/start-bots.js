@@ -1,6 +1,6 @@
-const { spawn } = require("node:child_process");
 const http = require("node:http");
 const path = require("node:path");
+const { ProcessSupervisor } = require("./process-supervisor");
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -23,42 +23,22 @@ function oneOfRequired(names) {
   throw new Error(`Missing required environment variable. Need one of: ${names.join(", ")}`);
 }
 
-function startProcess(label, cwd, script, env) {
-  console.log(`[launcher] starting ${label}`, { cwd, script });
-  const child = spawn(process.execPath, [script], {
-    cwd,
-    env: { ...process.env, ...env },
-    stdio: "inherit"
+const rootDir = path.resolve(__dirname, "..");
+async function notifyDiscord(content) {
+  const channelId = process.env.SYSTEM_ALERT_CHANNEL_ID;
+  const token = process.env.DISCORD_TOKEN;
+  if (!channelId || !token) return;
+  const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: { authorization: `Bot ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ content: `⚠️ **Jianghu System**\n${content}`, allowed_mentions: { parse: [] } })
   });
-
-  child.on("exit", (code, signal) => {
-    console.error(`[${label}] exited`, { code, signal });
-    process.exitCode = code || 1;
-  });
-
-  child.on("error", (error) => {
-    console.error(`[${label}] failed to start`, { message: error.message });
-    process.exitCode = 1;
-  });
-
-  return child;
+  if (!response.ok) throw new Error(`Discord alert HTTP ${response.status}`);
 }
 
-const rootDir = path.resolve(__dirname, "..");
-const port = Number(process.env.PORT || 10000);
-const healthServer = http.createServer((request, response) => {
-  const payload = {
-    ok: true,
-    service: "jianghu-discord-game",
-    bots: ["chat-bot", "game-bot"]
-  };
-
-  response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(payload));
-});
-
-healthServer.listen(port, "0.0.0.0", () => {
-  console.log(`[health] listening on port ${port}`);
+const supervisor = new ProcessSupervisor({
+  heartbeatTimeoutMs: Math.max(30000, Number(process.env.BOT_HEALTH_TIMEOUT_MS || 90000)),
+  notify: notifyDiscord
 });
 
 const chatEnv = {
@@ -77,5 +57,34 @@ const gameEnv = {
   SUPABASE_SECRET_KEY: oneOfRequired(["SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"])
 };
 
-startProcess("chat-bot", path.join(rootDir, "chat-bot"), "index.js", chatEnv);
-startProcess("game-bot", path.join(rootDir, "game-bot"), path.join("src", "index.js"), gameEnv);
+supervisor.add({ label: "chat-bot", cwd: path.join(rootDir, "chat-bot"), script: "index.js", env: chatEnv });
+supervisor.add({
+  label: "game-bot",
+  cwd: path.join(rootDir, "game-bot"),
+  script: path.join("src", "index.js"),
+  env: gameEnv
+});
+
+const port = Number(process.env.PORT || 10000);
+const healthServer = http.createServer((request, response) => {
+  if (request.url === "/live") {
+    response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ ok: true, service: "jianghu-discord-suite" }));
+    return;
+  }
+  const snapshot = supervisor.snapshot();
+  response.writeHead(snapshot.ok ? 200 : 503, { "content-type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify({ ...snapshot, service: "jianghu-discord-suite" }));
+});
+
+healthServer.listen(port, "0.0.0.0", () => console.log(`[health] listening on port ${port}`));
+supervisor.startAll();
+
+function shutdown() {
+  supervisor.stop();
+  healthServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

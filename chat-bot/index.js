@@ -72,6 +72,14 @@ function log(message, meta = {}) {
   console.log(`[chat-bot] ${message}`, meta);
 }
 
+function sendHealthHeartbeat() {
+  if (typeof process.send === "function") {
+    process.send({ type: "bot-health", service: "chat-bot", discordReady: client.isReady() });
+  }
+}
+
+setInterval(sendHealthHeartbeat, 20000).unref();
+
 function assertVoiceRuntime() {
   try {
     const encoder = new prism.opus.Encoder({ rate: 48000, channels: 2, frameSize: 960 });
@@ -457,6 +465,7 @@ async function handleTextCommand(message, cmd, args) {
 
 client.once(Events.ClientReady, (readyClient) => {
   log("logged in", { tag: readyClient.user.tag });
+  sendHealthHeartbeat();
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

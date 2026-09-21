@@ -6,6 +6,7 @@
   "scripts": {
     "postinstall": "npm --prefix chat-bot install && npm --prefix game-bot install",
     "start": "node scripts/start-bots.js",
-    "check": "node --check scripts/start-bots.js"
+    "check": "node --check scripts/start-bots.js && node --check scripts/process-supervisor.js",
+    "health:test": "node scripts/test-process-supervisor.js"
   }
 }
