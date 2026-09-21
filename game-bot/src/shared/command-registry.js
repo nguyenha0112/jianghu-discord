@@ -32,64 +32,6 @@ const commandBuilders = [
     .setName("work")
     .setDescription("Thực hiện hành động nghề nghiệp để nhận thưởng."),
   new SlashCommandBuilder()
-    .setName("dotpha")
-    .setDescription("Đột phá cảnh giới khi đã đủ điều kiện."),
-  new SlashCommandBuilder()
-    .setName("tutien")
-    .setDescription("Xem tổng quan tu tiên, đạo tu và tiến độ đột phá."),
-  new SlashCommandBuilder()
-    .setName("dongphu")
-    .setDescription("Xem hoặc nâng cấp động phủ của bạn.")
-    .addStringOption((option) =>
-      option
-        .setName("hanh_dong")
-        .setDescription("Chọn thao tác muốn thực hiện")
-        .setRequired(false)
-        .addChoices(
-          { name: "Xem động phủ", value: "xem" },
-          { name: "Nâng cấp động phủ", value: "nangcap" }
-        )
-    ),
-  new SlashCommandBuilder()
-    .setName("phapbao")
-    .setDescription("Xem và trang bị pháp bảo.")
-    .addStringOption((option) =>
-      option
-        .setName("hanh_dong")
-        .setDescription("Thao tác muốn thực hiện")
-        .setRequired(false)
-        .addChoices(
-          { name: "Xem pháp bảo", value: "xem" },
-          { name: "Trang bị pháp bảo", value: "trangbi" },
-          { name: "Tháo pháp bảo", value: "thao" }
-        )
-    )
-    .addStringOption((option) =>
-      option
-        .setName("artifact_id")
-        .setDescription("ID pháp bảo muốn trang bị")
-        .setRequired(false)
-    ),
-  new SlashCommandBuilder()
-    .setName("bicanh")
-    .setDescription("Thám hiểm bí cảnh, đánh quái hoặc khiêu chiến boss.")
-    .addStringOption((option) =>
-      option
-        .setName("realm_id")
-        .setDescription("ID bí cảnh muốn thám hiểm")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("che_do")
-        .setDescription("Chọn đánh quái thường hoặc boss")
-        .setRequired(false)
-        .addChoices(
-          { name: "Quái thường", value: "thuong" },
-          { name: "Boss", value: "boss" }
-        )
-    ),
-  new SlashCommandBuilder()
     .setName("inventory")
     .setDescription("Xem túi đồ hiện tại của bạn."),
   new SlashCommandBuilder()

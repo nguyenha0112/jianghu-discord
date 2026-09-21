@@ -18,6 +18,8 @@ const WORK_COOLDOWN_MS = 60 * 60 * 1000;
 const DAILY_BASE_XU = 45;
 const DAILY_DWELLING_XU = 5;
 const DAILY_BASE_NGOC = 1;
+const CULTIVATION_ENABLED = String(process.env.ENABLE_CULTIVATION_SYSTEM || "false").toLowerCase() === "true";
+const SIMPLE_PROFESSION_LEVEL_CAP = 50;
 
 function getNow() {
   return Date.now();
@@ -88,6 +90,7 @@ function getNextRealm(player) {
 }
 
 function getRealmCap(player) {
+  if (!CULTIVATION_ENABLED) return SIMPLE_PROFESSION_LEVEL_CAP;
   return getCurrentRealm(player)?.levelCap || 10;
 }
 
@@ -143,14 +146,14 @@ function getProfessionBonuses(player, professionId) {
     artifact,
     rootMatches,
     artifactMatches,
-    xuMultiplier:
+    xuMultiplier: CULTIVATION_ENABLED ?
       (rootMatches ? spiritRoot.xuMultiplier : 1) *
       (1 + dwelling.xuBonusPercent / 100) *
-      (artifactMatches ? artifact.xuMultiplier : 1),
-    professionXpMultiplier:
+      (artifactMatches ? artifact.xuMultiplier : 1) : 1,
+    professionXpMultiplier: CULTIVATION_ENABLED ?
       (rootMatches ? spiritRoot.professionXpMultiplier : 1) *
       (1 + dwelling.professionXpBonusPercent / 100) *
-      (artifactMatches ? artifact.professionXpMultiplier : 1)
+      (artifactMatches ? artifact.professionXpMultiplier : 1) : 1
   };
 }
 
@@ -236,8 +239,8 @@ async function claimDaily(userId, username) {
 
   const cultivation = ensureCultivation(player);
   const dwelling = getCurrentDwelling(player);
-  const xuGain = DAILY_BASE_XU + cultivation.dwellingLevel * DAILY_DWELLING_XU;
-  const ngocGain = DAILY_BASE_NGOC + Math.floor((cultivation.dwellingLevel - 1) / 3);
+  const xuGain = DAILY_BASE_XU + (CULTIVATION_ENABLED ? cultivation.dwellingLevel * DAILY_DWELLING_XU : 0);
+  const ngocGain = DAILY_BASE_NGOC + (CULTIVATION_ENABLED ? Math.floor((cultivation.dwellingLevel - 1) / 3) : 0);
   const playerXpResult = applyPlayerXp(
     {
       ...player.stats,

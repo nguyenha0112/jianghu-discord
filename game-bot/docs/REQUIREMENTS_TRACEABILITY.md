@@ -15,7 +15,7 @@ Bang nay map `requirement khach hang` -> `trang thai trong repo` -> `buoc tiep t
 | Noi Tu Viet Nam | Live partial-complete | Da chay trong server, co room gamification, PvP/PvE, reward, checkpoint PvP | Can strict mode, allowlist va balancing full pass |
 | Vua Tieng Viet | Live partial-complete | Da co gameplay co ban, xao toan bo ky tu, goi y tru diem, mo rong data | Can tiep tuc data curated, hint tuning va moderation tools |
 | Tai Xiu | Done MVP | Da co room system, button UI, settle flow, reward co ban | Can balance kinh te va polish UI them |
-| Tu tien / bi canh / phap bao / dong phu | Partial strong foundation | Da co framework va command nen | Can content data, combat progression va reward loop |
+| Tu tien / bi canh / phap bao / dong phu | Paused, hidden | Code va data duoc giu lai, command da an khoi production de giam do phuc tap | Chi mo lai sau khi core game on dinh va co UAT rieng |
 | Admin economy controls | Partial | Da co mot so command co ban | Can map quyen va command policy ro hon |
 | Asset system / icon mapping | Done MVP | Da co manifest asset va banner co ban | Can mo rong art / icon sau |
 | Seed / migration scripts | Partial | Supabase SQL va data dang co mot phan | Can chot seed v1 |

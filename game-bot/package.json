@@ -21,7 +21,8 @@
     "taixiu:test": "node src/scripts/test-taixiu.js",
     "xidach:test": "node src/scripts/test-xidach.js",
     "serverlog:test": "node src/scripts/test-serverlog.js",
-    "recovery:test": "node src/scripts/test-data-recovery.js"
+    "recovery:test": "node src/scripts/test-data-recovery.js",
+    "commands:test": "node src/scripts/test-command-surface.js"
   },
   "license": "MIT",
   "dependencies": {
