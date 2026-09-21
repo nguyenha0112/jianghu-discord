@@ -2,6 +2,8 @@ const { enableRoom, disableRoom } = require("../storage/xidach-room-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const {
   getSessionStatus,
+  dropSessionCacheForTest,
+  refundSessionForTest,
   handleMessage,
   handleButtonInteraction,
   stopSession
@@ -122,6 +124,18 @@ async function main() {
   if (!boardAttachment || boardAttachment.name !== "xidach-board.png") {
     throw new Error("Xi Dach board attachment was not generated as PNG");
   }
+
+  dropSessionCacheForTest(channel.id);
+  if (!getSessionStatus(channel.id)) {
+    throw new Error("Xi Dach session was not restored from persisted room config after simulated restart");
+  }
+
+  const statusA = createButtonInteraction(channel, guildId, `xidach:action:${channel.id}:status`, hostId, "Host");
+  const statusB = createButtonInteraction(channel, guildId, `xidach:action:${channel.id}:status`, hostId, "Host");
+  await Promise.all([handleButtonInteraction(statusA), handleButtonInteraction(statusB)]);
+  if (![statusA, statusB].some((interaction) => JSON.stringify(interaction.replies).includes("đang xử lý"))) {
+    throw new Error("Concurrent Xi Dach interactions were not locked");
+  }
   const boardBuffer = boardAttachment.attachment;
   if (!Buffer.isBuffer(boardBuffer) || boardBuffer.readUInt32BE(16) !== 900 || boardBuffer.readUInt32BE(20) !== 420) {
     throw new Error("Xi Dach PNG board must be exactly 900x420");
@@ -145,7 +159,22 @@ async function main() {
     throw new Error("Stale Xi Dach round was not stoppable by another player");
   }
 
-  console.log(JSON.stringify({ ok: true, lobbyIcon: true, formattedBet: true, pngBoard: "900x420", staleStop: true }, null, 2));
+  dropSessionCacheForTest(channel.id);
+  if (getSessionStatus(channel.id)) {
+    throw new Error("Stopped Xi Dach session remained persisted");
+  }
+
+  const [raceA, raceB] = await Promise.all([
+    handleMessage(createMessage(channel, guildId, "!play 100", hostId, "Host")),
+    handleMessage(createMessage(channel, guildId, "!play 100", otherId, "Other"))
+  ]);
+  if ([raceA, raceB].filter((result) => result?.ok).length !== 1 || !getSessionStatus(channel.id)) {
+    throw new Error("Concurrent text starts did not create exactly one Xi Dach session");
+  }
+  const raceSession = stopSession(channel.id);
+  await refundSessionForTest(raceSession);
+
+  console.log(JSON.stringify({ ok: true, lobbyIcon: true, formattedBet: true, pngBoard: "900x420", restartRecovery: true, interactionLock: true, startLock: true, staleStop: true }, null, 2));
 }
 
 main().catch((error) => {

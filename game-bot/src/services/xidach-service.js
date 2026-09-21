@@ -16,7 +16,7 @@ const { buildProgressBar } = require("../lib/ui-theme");
 const { buildCurrencyPairAttachment } = require("../lib/currency-assets");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
-const { getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
+const { enableRoom, getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
 const {
   updateXiDachRanking,
   getXiDachRanking,
@@ -25,6 +25,8 @@ const {
 } = require("../storage/xidach-ranking-store");
 
 const sessions = new Map();
+const interactionLocks = new Set();
+const roundStartLocks = new Set();
 
 const START_RE = /^!(play|batdau|xidach)\s+(.+)$/u;
 const STOP_KEYWORDS = new Set(["!stop", "!out"]);
@@ -318,7 +320,27 @@ function createSession({ guildId, channelId, channelName, hostUserId, hostUserna
 function touchSession(session) {
   if (session) {
     session.updatedAt = Date.now();
+    persistSession(session);
   }
+}
+
+function persistSession(session) {
+  const room = getRoom(session.channelId);
+  if (!room) return;
+  enableRoom(session.channelId, { ...room, activeSession: session });
+}
+
+function clearPersistedSession(channelId) {
+  const room = getRoom(channelId);
+  if (!room) return;
+  enableRoom(channelId, { ...room, activeSession: null });
+}
+
+function hydrateSession(channelId) {
+  const persisted = getRoom(channelId)?.activeSession;
+  if (!persisted || persisted.channelId !== channelId || !Array.isArray(persisted.deck)) return null;
+  sessions.set(channelId, persisted);
+  return persisted;
 }
 
 function isStaleSession(session) {
@@ -655,12 +677,12 @@ async function adjustPlayerXu(userId, username, amount, type, extra = {}) {
   return updated;
 }
 
-async function startRound({ guildId, channelId, channelName, userId, username, betAmount }) {
+async function startRoundUnlocked({ guildId, channelId, channelName, userId, username, betAmount }) {
   if (!isEnabledRoom(channelId)) {
     throw new Error("Phong nay chua duoc bat cho Xi Dach. Hay dung `/xidach-tao-phong` truoc.");
   }
 
-  if (sessions.has(channelId)) {
+  if (getSessionStatus(channelId)) {
     throw new Error("Phong nay dang co mot van Xi Dach roi. Hay choi xong hoac `!stop` truoc.");
   }
 
@@ -676,20 +698,38 @@ async function startRound({ guildId, channelId, channelName, userId, username, b
   await adjustPlayerXu(userId, username, -betAmount, "xidach_bet", { xpGain: BET_XP_GAIN });
   const session = createSession({ guildId, channelId, channelName, hostUserId: userId, hostUsername: username, betAmount });
   sessions.set(channelId, session);
+  persistSession(session);
   return session;
 }
 
+async function startRound(options) {
+  if (roundStartLocks.has(options.channelId)) {
+    throw new Error("Phòng đang xử lý một yêu cầu mở ván khác. Hãy thử lại sau một chút.");
+  }
+  roundStartLocks.add(options.channelId);
+  try {
+    return await startRoundUnlocked(options);
+  } finally {
+    roundStartLocks.delete(options.channelId);
+  }
+}
+
 function stopSession(channelId) {
-  const session = sessions.get(channelId);
+  const session = getSessionStatus(channelId);
   if (!session) {
     return null;
   }
   sessions.delete(channelId);
+  clearPersistedSession(channelId);
   return session;
 }
 
 function getSessionStatus(channelId) {
-  return sessions.get(channelId) || null;
+  return sessions.get(channelId) || hydrateSession(channelId);
+}
+
+function dropSessionCacheForTest(channelId) {
+  sessions.delete(channelId);
 }
 
 function getRoomConfig(channelId) {
@@ -705,6 +745,8 @@ async function refundSession(session) {
 }
 
 async function settleSession(channel, session) {
+  session.phase = "settling";
+  persistSession(session);
   while (getHandScore(session.dealerCards) < 17 && session.dealerCards.length < 5) {
     session.dealerCards.push(drawCard(session.deck));
   }
@@ -871,6 +913,7 @@ async function settleSession(channel, session) {
   }
 
   sessions.delete(session.channelId);
+  clearPersistedSession(session.channelId);
   await closeStatusMessage(channel, session);
   await channel.send({
     embeds: [buildSettlementEmbed(session, resultText)],
@@ -903,13 +946,8 @@ async function sendStartedRound(channel, nextSession, betAmount) {
   );
 }
 
-async function handleButtonInteraction(interaction) {
-  const parsed = parseActionCustomId(interaction.customId);
-  if (!parsed) {
-    return false;
-  }
-
-  const session = sessions.get(parsed.channelId);
+async function handleButtonInteractionUnlocked(interaction, parsed) {
+  const session = getSessionStatus(parsed.channelId);
   if (!session && parsed.action === "custom") {
     await interaction.showModal(buildBetModal(parsed.channelId));
     return true;
@@ -987,6 +1025,21 @@ async function handleButtonInteraction(interaction) {
   return false;
 }
 
+async function handleButtonInteraction(interaction) {
+  const parsed = parseActionCustomId(interaction.customId);
+  if (!parsed) return false;
+  if (interactionLocks.has(parsed.channelId)) {
+    await interaction.reply({ content: "Ván đang xử lý thao tác trước, bạn hãy bấm lại sau một chút.", ephemeral: true }).catch(() => {});
+    return true;
+  }
+  interactionLocks.add(parsed.channelId);
+  try {
+    return await handleButtonInteractionUnlocked(interaction, parsed);
+  } finally {
+    interactionLocks.delete(parsed.channelId);
+  }
+}
+
 async function handleModalInteraction(interaction) {
   const parsed = parseModalCustomId(interaction.customId);
   if (!parsed) {
@@ -1025,7 +1078,7 @@ async function handleMessage(message) {
 
   const raw = (message.content || "").trim();
   const lowered = normalizeText(raw);
-  const session = sessions.get(message.channel.id);
+  const session = getSessionStatus(message.channel.id);
 
   if (HELP_KEYWORDS.has(lowered)) {
     return { ok: true, skipReaction: true, reply: getHelpText() };
@@ -1112,6 +1165,8 @@ module.exports = {
   buildRoomGuideText,
   getRoomConfig,
   getSessionStatus,
+  dropSessionCacheForTest,
+  refundSessionForTest: refundSession,
   stopSession,
   handleButtonInteraction,
   handleModalInteraction,

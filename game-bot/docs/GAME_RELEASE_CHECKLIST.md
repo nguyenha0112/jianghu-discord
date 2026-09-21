@@ -62,7 +62,7 @@ Cập nhật: 2026-09-21
 | Vua Tiếng Việt | [x] | [~] | [~] | [x] | [ ] | [~] | Beta |
 | Tài Xỉu | [x] | [x] | [~] | [~] | [ ] | [x] | Beta |
 | Bầu Cua | [x] | [x] | [~] | [~] | [ ] | [x] | Beta |
-| Xì Dách | [x] | [x] | [x] PNG 900×420 | [x] chủ ván | [ ] | [x] | Beta tốt, còn thiếu persistence ván |
+| Xì Dách | [x] | [x] | [x] PNG 900×420 | [x] chủ ván + khóa channel | [~] khôi phục ván đang chơi | [x] | Beta tốt |
 | Oẳn Tù Tì | [ ] | [ ] | Không bắt buộc | [ ] | [ ] | [ ] | Planned |
 | Quiz Nhanh | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | Planned |
 
@@ -75,5 +75,7 @@ Cập nhật: 2026-09-21
 - [x] Font tiếng Việt hiển thị đúng trong ảnh preview.
 - [x] Nút Rút, Dừng, Xem lượt và Nhập cược có dấu.
 - [x] Test flow xác nhận đúng định dạng và kích thước PNG.
-- [ ] Lưu session đang chơi để tiếp tục hoặc hoàn cược sau restart.
-- [ ] Khóa xử lý theo channel để chống hai interaction đồng thời.
+- [x] Lưu session đang chơi trong cấu hình phòng để tiếp tục sau restart.
+- [x] Khóa xử lý theo channel để chống hai interaction đồng thời.
+- [x] Khóa bước mở ván để hai lệnh `!play` đồng thời chỉ trừ tiền một lần.
+- [ ] Bảo đảm settlement đúng một lần nếu process chết đúng giữa lúc trả thưởng.
