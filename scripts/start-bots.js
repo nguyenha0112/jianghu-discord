@@ -1,6 +1,7 @@
 const http = require("node:http");
 const path = require("node:path");
 const { ProcessSupervisor } = require("./process-supervisor");
+const { createDiscordAdminNotifier } = require("./discord-alerts");
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -24,17 +25,10 @@ function oneOfRequired(names) {
 }
 
 const rootDir = path.resolve(__dirname, "..");
-async function notifyDiscord(content) {
-  const channelId = process.env.SYSTEM_ALERT_CHANNEL_ID;
-  const token = process.env.DISCORD_TOKEN;
-  if (!channelId || !token) return;
-  const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-    method: "POST",
-    headers: { authorization: `Bot ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ content: `⚠️ **Jianghu System**\n${content}`, allowed_mentions: { parse: [] } })
-  });
-  if (!response.ok) throw new Error(`Discord alert HTTP ${response.status}`);
-}
+const notifyDiscord = createDiscordAdminNotifier({
+  token: process.env.DISCORD_TOKEN,
+  adminUserIds: process.env.ADMIN_USER_IDS
+});
 
 const supervisor = new ProcessSupervisor({
   heartbeatTimeoutMs: Math.max(30000, Number(process.env.BOT_HEALTH_TIMEOUT_MS || 90000)),
