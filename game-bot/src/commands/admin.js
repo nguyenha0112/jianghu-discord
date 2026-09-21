@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { assertCanManageGameRoom } = require("../lib/room-admin");
+const { buildAdminDashboardEmbed } = require("../services/admin-dashboard-service");
 const { enableRoom: enableWordChainRoom, disableRoom: disableWordChainRoom } = require("../storage/word-chain-room-store");
 const { enableRoom: enableVietnameseKingRoom, disableRoom: disableVietnameseKingRoom } = require("../storage/vietnamese-king-room-store");
 const { enableRoom: enableTaiXiuRoom, disableRoom: disableTaiXiuRoom } = require("../storage/taixiu-room-store");
@@ -55,6 +56,7 @@ module.exports = {
         .setDescription("Chọn việc quản trị muốn làm")
         .setRequired(true)
         .addChoices(
+          { name: "Xem trạng thái hệ thống", value: "system_status" },
           { name: "Tạo phòng Nối Từ PvE", value: "noitu_pve" },
           { name: "Tạo phòng Nối Từ PvP", value: "noitu_pvp" },
           { name: "Xóa phòng Nối Từ", value: "noitu_xoa" },
@@ -85,6 +87,11 @@ module.exports = {
       assertCanManageGameRoom(interaction);
       const action = interaction.options.getString("hanh_dong", true);
       const meta = roomMeta(interaction);
+
+      if (action === "system_status") {
+        await interaction.editReply({ embeds: [buildAdminDashboardEmbed(interaction.guildId)] });
+        return;
+      }
 
       if (action === "noitu_pve" || action === "noitu_pvp") {
         const mode = action === "noitu_pvp" ? "pvp" : "pve";

@@ -223,4 +223,4 @@ async function handleButtonInteraction(interaction) {
 function dropSessionCacheForTest(channelId) { sessions.delete(channelId); }
 function getSessionForTest(channelId) { return getSession(channelId); }
 
-module.exports = { handleMessage, handleButtonInteraction, dropSessionCacheForTest, getSessionForTest, clearSession, REWARD_XU, DAILY_REWARD_LIMIT };
+module.exports = { handleMessage, handleButtonInteraction, dropSessionCacheForTest, getSessionForTest, getSessionStatus: getSession, clearSession, REWARD_XU, DAILY_REWARD_LIMIT };

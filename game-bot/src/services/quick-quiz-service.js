@@ -224,4 +224,4 @@ async function resumeSessions(client) {
 function dropSessionCacheForTest(channelId) { sessions.delete(channelId); clearTimer(channelId); }
 function getSessionForTest(channelId) { return getSession(channelId); }
 
-module.exports = { handleMessage, handleButtonInteraction, resumeSessions, dropSessionCacheForTest, getSessionForTest, clearSession, REWARD_XU, ROUND_MS };
+module.exports = { handleMessage, handleButtonInteraction, resumeSessions, dropSessionCacheForTest, getSessionForTest, getSessionStatus: getSession, clearSession, REWARD_XU, ROUND_MS };

@@ -26,7 +26,8 @@
     "xidach:preview": "node src/scripts/render-xidach-preview.js",
     "catalog:test": "node src/scripts/test-game-catalog.js",
     "rps:test": "node src/scripts/test-rps.js",
-    "quiz:test": "node src/scripts/test-quick-quiz.js"
+    "quiz:test": "node src/scripts/test-quick-quiz.js",
+    "dashboard:test": "node src/scripts/test-admin-dashboard.js"
   },
   "license": "MIT",
   "dependencies": {

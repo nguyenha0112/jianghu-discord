@@ -149,6 +149,15 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
     return { ...ensureCache().rooms };
   }
 
+  function getSyncStatus() {
+    const store = ensureCache();
+    return {
+      pendingUpserts: Object.keys(store.pendingUpserts).length,
+      pendingDeletes: store.pendingDeletes.length,
+      pendingTotal: Object.keys(store.pendingUpserts).length + store.pendingDeletes.length
+    };
+  }
+
   function clearPendingUpsert(channelId, updatedAt) {
     const store = ensureCache();
     if (store.pendingUpserts[channelId]?.updatedAt === updatedAt) {
@@ -190,6 +199,7 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
     disableRoom,
     getRoom,
     listRooms,
+    getSyncStatus,
     isEnabledRoom,
     syncPending
   };
