@@ -22,13 +22,16 @@
     "xidach:test": "node src/scripts/test-xidach.js",
     "serverlog:test": "node src/scripts/test-serverlog.js",
     "recovery:test": "node src/scripts/test-data-recovery.js",
-    "commands:test": "node src/scripts/test-command-surface.js"
+    "commands:test": "node src/scripts/test-command-surface.js",
+    "xidach:preview": "node src/scripts/render-xidach-preview.js",
+    "catalog:test": "node src/scripts/test-game-catalog.js"
   },
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "discord.js": "^14.26.0",
     "dotenv": "^16.6.1",
+    "sharp": "^0.34.3",
     "ws": "^8.18.3"
   }
 }

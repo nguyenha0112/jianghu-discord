@@ -119,8 +119,12 @@ async function main() {
     throw new Error("Formatted bet command did not start Xi Dach round");
   }
   const boardAttachment = channel.sent.at(-1)?.payload?.files?.[0];
-  if (!boardAttachment || boardAttachment.name !== "xidach-board.svg") {
-    throw new Error("Xi Dach board attachment was not generated as SVG");
+  if (!boardAttachment || boardAttachment.name !== "xidach-board.png") {
+    throw new Error("Xi Dach board attachment was not generated as PNG");
+  }
+  const boardBuffer = boardAttachment.attachment;
+  if (!Buffer.isBuffer(boardBuffer) || boardBuffer.readUInt32BE(16) !== 900 || boardBuffer.readUInt32BE(20) !== 420) {
+    throw new Error("Xi Dach PNG board must be exactly 900x420");
   }
 
   const otherPlay = await handleMessage(createMessage(channel, guildId, "!play", otherId, "Other"));
@@ -141,7 +145,7 @@ async function main() {
     throw new Error("Stale Xi Dach round was not stoppable by another player");
   }
 
-  console.log(JSON.stringify({ ok: true, lobbyIcon: true, formattedBet: true, svgBoard: true, staleStop: true }, null, 2));
+  console.log(JSON.stringify({ ok: true, lobbyIcon: true, formattedBet: true, pngBoard: "900x420", staleStop: true }, null, 2));
 }
 
 main().catch((error) => {

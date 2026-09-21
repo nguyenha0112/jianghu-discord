@@ -8,8 +8,8 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
-const fs = require("node:fs");
 const path = require("node:path");
+const sharp = require("sharp");
 const { addPlayerXp } = require("../lib/player-progression");
 const { canManageGameRoom } = require("../lib/room-admin");
 const { buildProgressBar } = require("../lib/ui-theme");
@@ -151,13 +151,13 @@ function formatCardList(cards) {
 function buildBoardPayload(session, options = {}) {
   const revealDealer = options.revealDealer || false;
   return {
-    title: revealDealer ? "Ket qua Xi Dach" : "Ban Xi Dach",
+    title: revealDealer ? "Kết quả Xì Dách" : "Bàn Xì Dách",
     playerName: session.hostUsername,
     playerScore: getHandScore(session.playerCards),
     dealerScoreText: revealDealer ? String(getHandScore(session.dealerCards)) : "?",
     betText: formatXu(session.betAmount),
     revealDealer,
-    note: options.note || "Den luot nguoi choi quyet dinh.",
+    note: options.note || "Đến lượt người chơi quyết định.",
     playerCardsText: session.playerCards.map(cardTextLabel).join(", "),
     dealerCardsText: revealDealer
       ? session.dealerCards.map(cardTextLabel).join(", ")
@@ -187,21 +187,38 @@ function cardAssetName(card) {
   return `${card.rank}${card.suitCode || card.assetCode}.png`;
 }
 
-function cardDataUri(card, hidden = false) {
-  const filePath = path.join(CARD_DIR, hidden ? "BACK.png" : cardAssetName(card));
-  const data = fs.readFileSync(filePath).toString("base64");
-  return `data:image/png;base64,${data}`;
+function wrapBoardText(value, maxChars = 25, maxLines = 5) {
+  const words = String(value || "").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length <= maxChars) current = next;
+    else {
+      if (current) lines.push(current);
+      current = word.slice(0, maxChars);
+      if (lines.length >= maxLines) break;
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+  if (words.length && lines.length === maxLines && lines.join(" ").length < String(value).length) {
+    lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, Math.max(1, maxChars - 1))}…`;
+  }
+  return lines;
 }
 
-function buildCardImages(cards, { x, y, hiddenAfterFirst = false } = {}) {
-  return cards
-    .map((card, index) => {
-      const hidden = hiddenAfterFirst && index > 0;
-      const href = cardDataUri(card, hidden);
-      const cardX = x + index * 54;
-      return `<image href="${href}" x="${cardX}" y="${y}" width="70" height="98" preserveAspectRatio="xMidYMid meet"/>`;
-    })
-    .join("");
+async function buildCardComposites(cards, { startX, y, hiddenAfterFirst = false } = {}) {
+  const count = Math.max(1, cards.length);
+  const width = count >= 5 ? 52 : 62;
+  const height = Math.round(width * 1.4);
+  const availableWidth = 278;
+  const step = count === 1 ? 0 : Math.min(width + 8, (availableWidth - width) / (count - 1));
+  return Promise.all(cards.map(async (card, index) => {
+    const hidden = hiddenAfterFirst && index > 0;
+    const input = path.join(CARD_DIR, hidden ? "BACK.png" : cardAssetName(card));
+    const buffer = await sharp(input).resize(width, height, { fit: "contain" }).png().toBuffer();
+    return { input: buffer, left: Math.round(startX + index * step), top: y };
+  }));
 }
 
 function buildXuIconAttachment(attachmentName = "xu.svg") {
@@ -217,11 +234,13 @@ function buildXuIconAttachment(attachmentName = "xu.svg") {
   return new AttachmentBuilder(Buffer.from(svg, "utf8"), { name: attachmentName });
 }
 
-function buildBoardAttachment(session, options = {}) {
+async function buildBoardAttachment(session, options = {}) {
   const payload = buildBoardPayload(session, options);
   const dealerHidden = !payload.revealDealer;
-  const safeNote = escapeXml(payload.note);
   const safePlayerName = escapeXml(payload.playerName);
+  const noteLines = wrapBoardText(payload.note)
+    .map((line, index) => `<tspan x="638" dy="${index === 0 ? 0 : 24}">${escapeXml(line)}</tspan>`)
+    .join("");
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
   <defs>
@@ -242,32 +261,36 @@ function buildBoardAttachment(session, options = {}) {
     <rect x="42" y="116" width="540" height="126" rx="20" fill="#145540" stroke="#4fa27d"/>
     <text x="66" y="150" fill="#fff2d2" font-family="Arial, sans-serif" font-size="20" font-weight="700">Người chơi: ${safePlayerName}</text>
     <text x="66" y="178" fill="#e6f1e9" font-family="Arial, sans-serif" font-size="17">Điểm: ${payload.playerScore} • Cược: ${escapeXml(payload.betText)}</text>
-    ${buildCardImages(payload.playerCards, { x: 328, y: 132 })}
   </g>
 
   <g filter="url(#shadow)">
     <rect x="42" y="266" width="540" height="112" rx="20" fill="#0f4335" stroke="#3f8b6e"/>
     <text x="66" y="300" fill="#fff2d2" font-family="Arial, sans-serif" font-size="20" font-weight="700">Nhà cái</text>
     <text x="66" y="328" fill="#e6f1e9" font-family="Arial, sans-serif" font-size="17">Điểm: ${escapeXml(payload.dealerScoreText)}</text>
-    ${buildCardImages(payload.dealerCards, { x: 328, y: 273, hiddenAfterFirst: dealerHidden })}
   </g>
 
   <g filter="url(#shadow)">
     <rect x="614" y="116" width="244" height="262" rx="20" fill="#0a362b" stroke="#4f9d7c"/>
     <text x="638" y="152" fill="#fff2d2" font-family="Arial, sans-serif" font-size="20" font-weight="700">Thông tin ván</text>
-    <text x="638" y="190" fill="#e6f1e9" font-family="Arial, sans-serif" font-size="16">${safeNote}</text>
-    <text x="638" y="232" fill="#b9dccb" font-family="Arial, sans-serif" font-size="15">Bài bạn: ${payload.playerCards.length} lá</text>
-    <text x="638" y="260" fill="#b9dccb" font-family="Arial, sans-serif" font-size="15">Bài nhà cái: ${payload.dealerCards.length} lá</text>
-    <text x="638" y="304" fill="#f4d58d" font-family="Arial, sans-serif" font-size="15">Rút tối đa 5 lá.</text>
-    <text x="638" y="330" fill="#f4d58d" font-family="Arial, sans-serif" font-size="15">5 lá không quá 21 là Ngũ Linh.</text>
+    <text x="638" y="190" fill="#e6f1e9" font-family="DejaVu Sans, Arial, sans-serif" font-size="15">${noteLines}</text>
+    <text x="638" y="310" fill="#f4d58d" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">Rút tối đa 5 lá.</text>
+    <text x="638" y="338" fill="#f4d58d" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">5 lá ≤ 21 là Ngũ Linh.</text>
   </g>
 </svg>`;
 
-  return new AttachmentBuilder(Buffer.from(svg, "utf8"), { name: "xidach-board.svg" });
+  const [playerCards, dealerCards] = await Promise.all([
+    buildCardComposites(payload.playerCards, { startX: 290, y: 132 }),
+    buildCardComposites(payload.dealerCards, { startX: 290, y: 276, hiddenAfterFirst: dealerHidden })
+  ]);
+  const board = await sharp(Buffer.from(svg, "utf8"))
+    .composite([...playerCards, ...dealerCards])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  return new AttachmentBuilder(board, { name: "xidach-board.png" });
 }
 
-function buildVisualAttachments(session, options = {}) {
-  return [buildBoardAttachment(session, options)];
+async function buildVisualAttachments(session, options = {}) {
+  return [await buildBoardAttachment(session, options)];
 }
 
 function createSession({ guildId, channelId, channelName, hostUserId, hostUsername, betAmount }) {
@@ -322,15 +345,15 @@ function buildActionComponents(session) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:hit`)
-        .setLabel("Rut")
+        .setLabel("Rút")
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:stand`)
-        .setLabel("Dung")
+        .setLabel("Dừng")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${session.channelId}:status`)
-        .setLabel("Xem luot")
+        .setLabel("Xem lượt")
         .setStyle(ButtonStyle.Secondary)
     )
   ];
@@ -355,7 +378,7 @@ function buildLobbyComponents(channelId) {
       ),
       new ButtonBuilder()
         .setCustomId(`${ACTION_PREFIX}${channelId}:custom`)
-        .setLabel("Nhap cuoc")
+        .setLabel("Nhập cược")
         .setStyle(ButtonStyle.Success)
     )
   ];
@@ -381,12 +404,12 @@ function buildLobbyEmbed() {
 function buildBetModal(channelId) {
   return new ModalBuilder()
     .setCustomId(`${MODAL_PREFIX}${channelId}`)
-    .setTitle("Nhap muc cuoc Xi Dach")
+    .setTitle("Nhập mức cược Xì Dách")
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId("amount")
-          .setLabel(`Nhap so Xu (${MIN_BET} - ${MAX_BET})`)
+          .setLabel(`Nhập số Xu (${MIN_BET} - ${MAX_BET})`)
           .setPlaceholder("Vi du: 12000")
           .setRequired(true)
           .setStyle(TextInputStyle.Short)
@@ -413,7 +436,7 @@ function buildStatusEmbed(session, note = "Den luot nguoi choi quyet dinh.") {
       ].join("\n")
     )
     .addFields({ name: "Thong bao", value: note, inline: false })
-    .setImage("attachment://xidach-board.svg")
+    .setImage("attachment://xidach-board.png")
     .setFooter({ text: "Bàn bài dùng icon nhỏ để dễ nhìn hơn trên Discord mobile." });
 }
 
@@ -432,7 +455,7 @@ function buildSettlementEmbed(session, resultText) {
         `**Nha cai - ${dealerScore}:** ${formatCardList(session.dealerCards)}`
       ].join("\n")
     )
-    .setImage("attachment://xidach-board.svg")
+    .setImage("attachment://xidach-board.png")
     .setFooter({ text: "Bàn bài cuối đã được render thành một khung tổng hợp." });
 }
 
@@ -440,7 +463,7 @@ async function sendOrRefreshStatusMessage(channel, session, note) {
   const payload = {
     embeds: [buildStatusEmbed(session, note)],
     components: buildActionComponents(session),
-    files: buildVisualAttachments(session, { note, revealDealer: false })
+    files: await buildVisualAttachments(session, { note, revealDealer: false })
   };
 
   if (!session.statusMessageId) {
@@ -470,7 +493,7 @@ async function closeStatusMessage(channel, session) {
     await message.edit({
       embeds: [buildStatusEmbed(session, "Van da ket thuc.")],
       components: [],
-      files: buildVisualAttachments(session, { note: "Van da ket thuc.", revealDealer: false })
+      files: await buildVisualAttachments(session, { note: "Ván đã kết thúc.", revealDealer: false })
     });
   } catch {
     // Bo qua neu khong edit duoc tin nhan ban cu.
@@ -851,7 +874,7 @@ async function settleSession(channel, session) {
   await closeStatusMessage(channel, session);
   await channel.send({
     embeds: [buildSettlementEmbed(session, resultText)],
-    files: buildVisualAttachments(session, { note: resultText, revealDealer: true })
+    files: await buildVisualAttachments(session, { note: resultText, revealDealer: true })
   }).catch(() => {});
 }
 
@@ -1025,7 +1048,7 @@ async function handleMessage(message) {
       ok: true,
       skipReaction: true,
       embeds: [buildStatusEmbed(session, "Day la trang thai hien tai cua van.")],
-      files: buildVisualAttachments(session, { note: "Day la trang thai hien tai cua van.", revealDealer: false })
+      files: await buildVisualAttachments(session, { note: "Đây là trạng thái hiện tại của ván.", revealDealer: false })
     };
   }
 

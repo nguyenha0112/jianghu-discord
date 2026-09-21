@@ -20,7 +20,7 @@ module.exports = {
 
     await interaction.reply({
       embeds: [buildStatusEmbed(session, "Day la trang thai hien tai cua van Xi Dach.")],
-      files: buildVisualAttachments(session)
+      files: await buildVisualAttachments(session)
     });
   }
 };

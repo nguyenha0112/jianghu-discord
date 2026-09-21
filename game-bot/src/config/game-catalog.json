@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "games": [
+    { "key": "word_chain", "name": "Nối Từ", "status": "live", "category": "word", "entry": "!play", "controls": "message", "roomScoped": true, "dataSource": "dictionary", "rewardPolicy": "word-game-v1" },
+    { "key": "vietnamese_king", "name": "Vua Tiếng Việt", "status": "live", "category": "word", "entry": "!play", "controls": "message", "roomScoped": true, "dataSource": "curated-questions", "rewardPolicy": "word-game-v1" },
+    { "key": "taixiu", "name": "Tài Xỉu", "status": "live", "category": "casino", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "random", "rewardPolicy": "betting-v1" },
+    { "key": "baucua", "name": "Bầu Cua", "status": "live", "category": "casino", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "random", "rewardPolicy": "betting-v1" },
+    { "key": "xidach", "name": "Xì Dách", "status": "live", "category": "card", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "standard-52-card-deck", "rewardPolicy": "betting-v1", "visual": { "format": "png", "width": 900, "height": 420 } },
+    { "key": "rock_paper_scissors", "name": "Oẳn Tù Tì", "status": "planned", "category": "pvp", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "fixed-rules", "rewardPolicy": "pvp-light-v1" },
+    { "key": "quick_quiz", "name": "Quiz Nhanh", "status": "planned", "category": "quiz", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "curated-questions", "rewardPolicy": "quiz-v1" }
+  ]
+}
