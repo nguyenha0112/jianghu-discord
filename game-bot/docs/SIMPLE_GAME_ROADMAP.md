@@ -74,7 +74,7 @@ Mỗi game mới phải có cùng cấu trúc:
 
 ### Giai đoạn 2 - Game nhẹ
 
-- [ ] Xây Oẳn Tù Tì PvP.
+- [x] Xây Oẳn Tù Tì PvP.
 - [ ] Xây Quiz nhanh và công cụ duyệt câu hỏi.
 - [ ] Thêm ranking theo mùa, không xóa thành tích tổng.
 

@@ -8,6 +8,7 @@ const { hydrateRooms: hydrateTaiXiuRooms } = require("./storage/taixiu-room-stor
 const { hydrateRooms: hydrateBauCuaRooms } = require("./storage/baucua-room-store");
 const { hydrateRooms: hydrateVietnameseKingRooms } = require("./storage/vietnamese-king-room-store");
 const { hydrateRooms: hydrateXiDachRooms } = require("./storage/xidach-room-store");
+const { hydrateRooms: hydrateRpsRooms } = require("./storage/rps-room-store");
 const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-store");
 const { hydrateRooms: hydrateServerLogRooms } = require("./storage/serverlog-room-store");
 const { announceMemberLeave } = require("./lib/serverlog-announcer");
@@ -30,6 +31,7 @@ const {
   handleModalInteraction: handleXiDachModalInteraction
 } = require("./services/xidach-service");
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
+const { handleMessage: handleRpsMessage, handleButtonInteraction: handleRpsButtonInteraction } = require("./services/rps-service");
 const { recoverPendingData } = require("./services/data-recovery-service");
 
 const token = process.env.DISCORD_TOKEN;
@@ -244,6 +246,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (xiDachHandled) {
       return;
     }
+
+    const rpsHandled = await handleRpsButtonInteraction(interaction).catch((error) => {
+      console.error("Oan Tu Ti button interaction failed", error);
+      return false;
+    });
+    if (rpsHandled) {
+      return;
+    }
   }
 
   if (interaction.isModalSubmit()) {
@@ -335,6 +345,10 @@ client.on(Events.MessageCreate, async (message) => {
     finalResult = await handleXiDachMessage(message);
   }
   if (!finalResult) {
+    handlerName = "rock-paper-scissors";
+    finalResult = await handleRpsMessage(message);
+  }
+  if (!finalResult) {
     return;
   }
 
@@ -382,6 +396,7 @@ async function bootstrap() {
     hydrateBauCuaRooms(),
     hydrateVietnameseKingRooms(),
     hydrateXiDachRooms(),
+    hydrateRpsRooms(),
     hydrateLevelUpRooms(),
     hydrateServerLogRooms()
   ]);

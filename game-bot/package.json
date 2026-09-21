@@ -24,7 +24,8 @@
     "recovery:test": "node src/scripts/test-data-recovery.js",
     "commands:test": "node src/scripts/test-command-surface.js",
     "xidach:preview": "node src/scripts/render-xidach-preview.js",
-    "catalog:test": "node src/scripts/test-game-catalog.js"
+    "catalog:test": "node src/scripts/test-game-catalog.js",
+    "rps:test": "node src/scripts/test-rps.js"
   },
   "license": "MIT",
   "dependencies": {

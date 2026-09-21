@@ -63,7 +63,7 @@ Cập nhật: 2026-09-21
 | Tài Xỉu | [x] | [x] | [~] | [~] | [ ] | [x] | Beta |
 | Bầu Cua | [x] | [x] | [~] | [~] | [ ] | [x] | Beta |
 | Xì Dách | [x] | [x] | [x] PNG 900×420 | [x] chủ ván + khóa channel | [~] khôi phục ván đang chơi | [x] | Beta tốt |
-| Oẳn Tù Tì | [ ] | [ ] | Không bắt buộc | [ ] | [ ] | [ ] | Planned |
+| Oẳn Tù Tì | [x] | [x] | Không bắt buộc | [x] khóa channel | [x] khôi phục lobby/lựa chọn | [x] 10 thắng/ngày | Beta |
 | Quiz Nhanh | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | Planned |
 
 ## Kiểm tra Xì Dách đã đạt trong bản hiện tại

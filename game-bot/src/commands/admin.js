@@ -5,6 +5,7 @@ const { enableRoom: enableVietnameseKingRoom, disableRoom: disableVietnameseKing
 const { enableRoom: enableTaiXiuRoom, disableRoom: disableTaiXiuRoom } = require("../storage/taixiu-room-store");
 const { enableRoom: enableBauCuaRoom, disableRoom: disableBauCuaRoom } = require("../storage/baucua-room-store");
 const { enableRoom: enableXiDachRoom, disableRoom: disableXiDachRoom } = require("../storage/xidach-room-store");
+const { enableRoom: enableRpsRoom, disableRoom: disableRpsRoom } = require("../storage/rps-room-store");
 const {
   enableRoomPersistent: enableLevelUpRoomPersistent,
   disableRoom: disableLevelUpRoom
@@ -64,6 +65,8 @@ module.exports = {
           { name: "Xóa phòng Bầu Cua", value: "baucua_xoa" },
           { name: "Tạo phòng Xì Dách", value: "xidach_tao" },
           { name: "Xóa phòng Xì Dách", value: "xidach_xoa" },
+          { name: "Tạo phòng Oẳn Tù Tì", value: "rps_tao" },
+          { name: "Xóa phòng Oẳn Tù Tì", value: "rps_xoa" },
           { name: "Tạo phòng thông báo lên cấp", value: "levelup_tao" },
           { name: "Xóa phòng thông báo lên cấp", value: "levelup_xoa" },
           { name: "Tạo phòng log người rời server", value: "serverlog_tao" },
@@ -146,6 +149,20 @@ module.exports = {
       if (action === "xidach_xoa") {
         disableXiDachRoom(interaction.channelId);
         await interaction.editReply(`Đã xóa cấu hình Xì Dách ở <#${interaction.channelId}>.`);
+        return;
+      }
+
+      if (action === "rps_tao") {
+        enableRpsRoom(interaction.channelId, meta);
+        await setTopic(interaction, "Oẳn Tù Tì PvP | !play mở trận | bấm Tham gia | chọn kín Búa/Kéo/Bao | !stop hủy");
+        await sendGuide(interaction, "Hướng dẫn Oẳn Tù Tì", "Nhắn `!play`, người thứ hai bấm **Tham gia**, sau đó mỗi người chọn kín Búa/Kéo/Bao.", 0xe67e22);
+        await interaction.editReply(`Đã bật <#${interaction.channelId}> thành phòng Oẳn Tù Tì.`);
+        return;
+      }
+
+      if (action === "rps_xoa") {
+        disableRpsRoom(interaction.channelId);
+        await interaction.editReply(`Đã xóa cấu hình Oẳn Tù Tì ở <#${interaction.channelId}>.`);
         return;
       }
 
