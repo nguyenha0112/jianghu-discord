@@ -30,6 +30,7 @@ const {
   handleModalInteraction: handleXiDachModalInteraction
 } = require("./services/xidach-service");
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
+const { recoverPendingData } = require("./services/data-recovery-service");
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -66,6 +67,9 @@ async function checkSupabaseHealth() {
   try {
     const { error } = await getSupabaseClient().from("players").select("user_id", { head: true, count: "exact" });
     supabaseReady = !error;
+    if (supabaseReady) {
+      await recoverPendingData();
+    }
   } catch (error) {
     supabaseReady = false;
   }

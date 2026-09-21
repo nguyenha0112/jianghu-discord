@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const supabaseStore = require("./supabase-store");
 
-const dataDir = path.join(__dirname, "..", "..", "data");
+const dataDir = process.env.GAME_DATA_DIR || path.join(__dirname, "..", "..", "data");
 const dataFile = path.join(dataDir, "transactions.json");
 
 function ensureStore() {
@@ -27,26 +27,59 @@ function writeStore(store) {
 
 function appendTransactionLocal(entry) {
   const store = readStore();
-  store.transactions.push({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    ...entry
-  });
+  store.transactions.push(entry);
   writeStore(store);
 }
 
+function buildTransaction(entry) {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return {
+    id,
+    createdAt: new Date().toISOString(),
+    ...entry,
+    changes: { ...(entry.changes || {}), _syncId: id }
+  };
+}
+
 function appendTransaction(entry) {
+  const transaction = buildTransaction(entry);
   if (supabaseStore.hasSupabaseConfig()) {
-    supabaseStore.appendTransaction(entry).catch((error) => {
+    supabaseStore.appendTransaction(transaction).catch((error) => {
       console.error("Supabase appendTransaction loi, fallback ve JSON:", error.message);
-      appendTransactionLocal(entry);
+      appendTransactionLocal(transaction);
     });
     return;
   }
 
-  appendTransactionLocal(entry);
+  appendTransactionLocal(transaction);
+}
+
+async function syncPendingTransactions() {
+  const store = readStore();
+  const pending = [...store.transactions];
+  if (!supabaseStore.hasSupabaseConfig()) return { synced: 0, pending: pending.length };
+  let synced = 0;
+  const completed = new Set();
+  for (const transaction of pending) {
+    const syncId = transaction.changes?._syncId || transaction.id;
+    if (!(await supabaseStore.hasTransactionSyncId(syncId))) {
+      await supabaseStore.appendTransaction({
+        ...transaction,
+        changes: { ...(transaction.changes || {}), _syncId: syncId }
+      });
+    }
+    completed.add(transaction.id);
+    synced += 1;
+  }
+  if (completed.size) {
+    const latest = readStore();
+    latest.transactions = latest.transactions.filter((entry) => !completed.has(entry.id));
+    writeStore(latest);
+  }
+  return { synced, pending: readStore().transactions.length };
 }
 
 module.exports = {
-  appendTransaction
+  appendTransaction,
+  syncPendingTransactions
 };

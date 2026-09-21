@@ -66,8 +66,10 @@ function formatChanges(type, changes = {}) {
       return `Chuyen 🪙 ${formatNumber(Math.abs(Number(changes.xu || 0)))} Xu cho **${changes.toUsername || changes.toUserId || "khong ro"}**${changes.fee ? `, phi ${formatNumber(Number(changes.fee))} Xu` : ""}.`;
     case "give_xu_received":
       return `Nhan 🪙 ${formatNumber(Number(changes.xu || 0))} Xu tu **${changes.fromUsername || changes.fromUserId || "khong ro"}**.`;
-    default:
-      return JSON.stringify(changes);
+    default: {
+      const { _syncId, ...visibleChanges } = changes;
+      return JSON.stringify(visibleChanges);
+    }
   }
 }
 

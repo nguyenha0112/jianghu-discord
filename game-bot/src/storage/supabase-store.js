@@ -331,6 +331,15 @@ async function updatePlayer(userId, patch) {
   return next;
 }
 
+async function upsertPlayerSnapshot(player) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("players").upsert(mapPlayerToRow(player), { onConflict: "user_id" });
+  if (error) throw error;
+  await replaceInventory(player.userId, player.inventory || {});
+  return player;
+}
+
 async function appendTransaction(entry) {
   ensureConfigured();
   const supabase = getSupabaseClient();
@@ -338,12 +347,25 @@ async function appendTransaction(entry) {
     user_id: entry.userId,
     username: entry.username,
     type: entry.type,
-    changes: entry.changes
+    changes: entry.changes,
+    created_at: entry.createdAt || new Date().toISOString()
   });
 
   if (error) {
     throw error;
   }
+}
+
+async function hasTransactionSyncId(syncId) {
+  ensureConfigured();
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id")
+    .contains("changes", { _syncId: syncId })
+    .limit(1);
+  if (error) throw error;
+  return Boolean(data?.length);
 }
 
 async function getRecentTransactions(userId, limit = 10) {
@@ -382,7 +404,9 @@ module.exports = {
   getPlayer,
   listPlayers,
   updatePlayer,
+  upsertPlayerSnapshot,
   appendTransaction,
+  hasTransactionSyncId,
   getRecentTransactions,
   deletePlayer
 };

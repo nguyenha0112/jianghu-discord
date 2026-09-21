@@ -3,8 +3,9 @@ const path = require("node:path");
 const spiritRoots = require("../config/spirit-roots");
 const supabaseStore = require("./supabase-store");
 
-const dataDir = path.join(__dirname, "..", "..", "data");
+const dataDir = process.env.GAME_DATA_DIR || path.join(__dirname, "..", "..", "data");
 const dataFile = path.join(dataDir, "players.json");
+const syncStateFile = path.join(dataDir, "player-sync-state.json");
 
 function ensureStore() {
   if (!fs.existsSync(dataDir)) {
@@ -24,6 +25,44 @@ function readStore() {
 function writeStore(store) {
   ensureStore();
   fs.writeFileSync(dataFile, JSON.stringify(store, null, 2));
+}
+
+function readSyncState() {
+  ensureStore();
+  if (!fs.existsSync(syncStateFile)) return { dirtyPlayers: [] };
+  return JSON.parse(fs.readFileSync(syncStateFile, "utf8"));
+}
+
+function writeSyncState(state) {
+  ensureStore();
+  fs.writeFileSync(syncStateFile, JSON.stringify(state, null, 2));
+}
+
+function isPlayerDirty(userId) {
+  return readSyncState().dirtyPlayers.includes(userId);
+}
+
+function markPlayerDirty(userId) {
+  const state = readSyncState();
+  if (!state.dirtyPlayers.includes(userId)) state.dirtyPlayers.push(userId);
+  writeSyncState(state);
+}
+
+function clearPlayerDirty(userId) {
+  const state = readSyncState();
+  state.dirtyPlayers = state.dirtyPlayers.filter((id) => id !== userId);
+  writeSyncState(state);
+}
+
+function savePlayerLocal(player) {
+  const store = readStore();
+  store.players[player.userId] = {
+    ...player,
+    cultivation: normalizeCultivation(player.userId, player.cultivation),
+    updatedAt: player.updatedAt || new Date().toISOString()
+  };
+  writeStore(store);
+  return store.players[player.userId];
 }
 
 function pickSpiritRoot(userId) {
@@ -120,7 +159,7 @@ function getPlayerLocal(userId) {
 
 function updatePlayerLocal(userId, patch) {
   const store = readStore();
-  const current = store.players[userId];
+  const current = store.players[userId] || defaultPlayer(userId, patch.username || `Discord-${userId}`);
   store.players[userId] = {
     ...current,
     ...patch,
@@ -146,26 +185,30 @@ function listPlayersLocal() {
 }
 
 async function ensurePlayer(userId, username) {
+  if (isPlayerDirty(userId)) return ensurePlayerLocal(userId, username);
   if (supabaseStore.hasSupabaseConfig()) {
     try {
       const player = await supabaseStore.ensurePlayer(userId, username);
       if (player) {
-        return player;
+        return savePlayerLocal(player);
       }
     } catch (error) {
       console.error("Supabase ensurePlayer loi, fallback ve JSON:", error.message);
     }
   }
 
-  return ensurePlayerLocal(userId, username);
+  const player = ensurePlayerLocal(userId, username);
+  markPlayerDirty(userId);
+  return player;
 }
 
 async function getPlayer(userId) {
+  if (isPlayerDirty(userId)) return getPlayerLocal(userId);
   if (supabaseStore.hasSupabaseConfig()) {
     try {
       const player = await supabaseStore.getPlayer(userId);
       if (player) {
-        return player;
+        return savePlayerLocal(player);
       }
     } catch (error) {
       console.error("Supabase getPlayer loi, fallback ve JSON:", error.message);
@@ -176,21 +219,29 @@ async function getPlayer(userId) {
 }
 
 async function updatePlayer(userId, patch) {
+  if (isPlayerDirty(userId)) return updatePlayerLocal(userId, patch);
   if (supabaseStore.hasSupabaseConfig()) {
     try {
-      return await supabaseStore.updatePlayer(userId, patch);
+      const player = await supabaseStore.updatePlayer(userId, patch);
+      clearPlayerDirty(userId);
+      return savePlayerLocal(player);
     } catch (error) {
       console.error("Supabase updatePlayer loi, fallback ve JSON:", error.message);
     }
   }
 
-  return updatePlayerLocal(userId, patch);
+  const player = updatePlayerLocal(userId, patch);
+  markPlayerDirty(userId);
+  return player;
 }
 
 async function listPlayers() {
   if (supabaseStore.hasSupabaseConfig()) {
     try {
-      return await supabaseStore.listPlayers();
+      const remotePlayers = await supabaseStore.listPlayers();
+      const dirtyIds = new Set(readSyncState().dirtyPlayers);
+      const cleanRemote = remotePlayers.filter((player) => !dirtyIds.has(player.userId));
+      return [...listPlayersLocal().filter((player) => dirtyIds.has(player.userId)), ...cleanRemote];
     } catch (error) {
       console.error("Supabase listPlayers loi, fallback ve JSON:", error.message);
     }
@@ -199,9 +250,27 @@ async function listPlayers() {
   return listPlayersLocal();
 }
 
+async function syncDirtyPlayers() {
+  if (!supabaseStore.hasSupabaseConfig()) return { synced: 0, pending: readSyncState().dirtyPlayers.length };
+  const dirtyIds = [...readSyncState().dirtyPlayers];
+  let synced = 0;
+  for (const userId of dirtyIds) {
+    const player = getPlayerLocal(userId);
+    if (!player) {
+      clearPlayerDirty(userId);
+      continue;
+    }
+    await supabaseStore.upsertPlayerSnapshot(player);
+    clearPlayerDirty(userId);
+    synced += 1;
+  }
+  return { synced, pending: readSyncState().dirtyPlayers.length };
+}
+
 module.exports = {
   ensurePlayer,
   getPlayer,
   updatePlayer,
-  listPlayers
+  listPlayers,
+  syncDirtyPlayers
 };

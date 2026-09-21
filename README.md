@@ -76,3 +76,12 @@ Nen khoa tiep cac phan:
 2. profession action loop
 3. reward cap va monthly eligibility
 4. data schema cho game bot
+
+## Giam sat production
+
+- `/live` chi xac nhan tien trinh launcher va cong HTTP con hoat dong. Dat Render Health Check Path vao duong dan nay.
+- `/health` va `/` tra `200` khi ca chatbot, game bot, Discord va Supabase deu san sang; tra `503` neu mot thanh phan bi loi.
+- Dat `SYSTEM_ALERT_CHANNEL_ID` thanh ID cua mot kenh quan tri rieng de nhan canh bao bot crash, Supabase mat ket noi va thong bao phuc hoi.
+- Launcher tu khoi dong lai bot con bi crash voi backoff toi da 30 giay.
+- Player, transaction va cau hinh phong loi khi ghi Supabase duoc dua vao hang cho local va tu dong dong bo lai khi ket noi phuc hoi.
+- Neu hosting co persistent disk, dat `GAME_DATA_DIR` vao thu muc mount de hang cho song qua deploy. Khong co persistent disk thi hang cho van co the mat khi container bi thay the.
