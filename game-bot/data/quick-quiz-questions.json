@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "questions": [
+    { "id": "tv-001", "category": "Tiếng Việt", "question": "Từ nào đồng nghĩa gần nhất với 'siêng năng'?", "options": ["Chăm chỉ", "Vội vàng", "Im lặng", "Chậm chạp"], "correctIndex": 0, "explanation": "Chăm chỉ chỉ sự chịu khó và siêng năng." },
+    { "id": "tv-002", "category": "Tiếng Việt", "question": "Từ nào viết đúng chính tả?", "options": ["Sáp nhập", "Sát nhập", "Xáp nhập", "Xát nhập"], "correctIndex": 0, "explanation": "Cách viết chuẩn là sáp nhập." },
+    { "id": "tv-003", "category": "Tiếng Việt", "question": "Thành ngữ nào nói về tinh thần đoàn kết?", "options": ["Đồng tâm hiệp lực", "Đứng núi này trông núi nọ", "Nước đến chân mới nhảy", "Há miệng chờ sung"], "correctIndex": 0, "explanation": "Đồng tâm hiệp lực nghĩa là cùng lòng, cùng góp sức." },
+    { "id": "tv-004", "category": "Tiếng Việt", "question": "Từ nào trái nghĩa với 'khiêm tốn'?", "options": ["Kiêu căng", "Nhẫn nại", "Hiền lành", "Cẩn thận"], "correctIndex": 0, "explanation": "Kiêu căng là tự cao, trái với khiêm tốn." },
+    { "id": "tv-005", "category": "Tiếng Việt", "question": "Trong câu 'Mặt trời thức dậy', biện pháp tu từ nào được dùng?", "options": ["Nhân hóa", "So sánh", "Điệp ngữ", "Nói quá"], "correctIndex": 0, "explanation": "Mặt trời được gán hành động của con người nên đây là nhân hóa." },
+    { "id": "tv-006", "category": "Tiếng Việt", "question": "Từ nào là từ láy?", "options": ["Lấp lánh", "Xe đạp", "Bàn ghế", "Nhà cửa"], "correctIndex": 0, "explanation": "Lấp lánh là từ láy âm." },
+    { "id": "kt-001", "category": "Kiến thức vui", "question": "Hành tinh nào gần Mặt Trời nhất?", "options": ["Sao Thủy", "Sao Kim", "Trái Đất", "Sao Hỏa"], "correctIndex": 0, "explanation": "Sao Thủy là hành tinh gần Mặt Trời nhất." },
+    { "id": "kt-002", "category": "Kiến thức vui", "question": "Một tuần có bao nhiêu giờ?", "options": ["168", "144", "120", "196"], "correctIndex": 0, "explanation": "7 ngày nhân 24 giờ bằng 168 giờ." },
+    { "id": "kt-003", "category": "Kiến thức vui", "question": "Loài vật nào là động vật có vú?", "options": ["Cá heo", "Cá mập", "Cá ngừ", "Cá kiếm"], "correctIndex": 0, "explanation": "Cá heo thở bằng phổi và nuôi con bằng sữa." },
+    { "id": "kt-004", "category": "Kiến thức vui", "question": "Nước đóng băng ở bao nhiêu độ C trong điều kiện thường?", "options": ["0°C", "10°C", "32°C", "100°C"], "correctIndex": 0, "explanation": "Nước tinh khiết đóng băng ở 0°C trong điều kiện tiêu chuẩn." },
+    { "id": "kt-005", "category": "Kiến thức vui", "question": "Châu lục nào có diện tích lớn nhất?", "options": ["Châu Á", "Châu Phi", "Châu Âu", "Châu Mỹ"], "correctIndex": 0, "explanation": "Châu Á là châu lục lớn nhất thế giới." },
+    { "id": "kt-006", "category": "Kiến thức vui", "question": "Cơ quan nào bơm máu đi khắp cơ thể?", "options": ["Tim", "Phổi", "Gan", "Dạ dày"], "correctIndex": 0, "explanation": "Tim co bóp để đưa máu đi khắp cơ thể." },
+    { "id": "vn-001", "category": "Việt Nam", "question": "Thủ đô của Việt Nam là thành phố nào?", "options": ["Hà Nội", "Huế", "Đà Nẵng", "Hải Phòng"], "correctIndex": 0, "explanation": "Hà Nội là thủ đô của Việt Nam." },
+    { "id": "vn-002", "category": "Việt Nam", "question": "Vịnh Hạ Long thuộc tỉnh nào?", "options": ["Quảng Ninh", "Thanh Hóa", "Khánh Hòa", "Quảng Bình"], "correctIndex": 0, "explanation": "Vịnh Hạ Long nằm ở tỉnh Quảng Ninh." },
+    { "id": "vn-003", "category": "Việt Nam", "question": "Sông nào thường được nhắc đến cùng vùng đồng bằng Nam Bộ?", "options": ["Sông Cửu Long", "Sông Hồng", "Sông Mã", "Sông Cả"], "correctIndex": 0, "explanation": "Hệ thống sông Cửu Long tạo nên đồng bằng lớn ở Nam Bộ." },
+    { "id": "vn-004", "category": "Việt Nam", "question": "Tết Trung Thu thường diễn ra vào ngày nào âm lịch?", "options": ["15 tháng 8", "1 tháng 1", "10 tháng 3", "5 tháng 5"], "correctIndex": 0, "explanation": "Tết Trung Thu là ngày rằm tháng Tám âm lịch." },
+    { "id": "logic-001", "category": "Logic", "question": "Số tiếp theo của dãy 2, 4, 8, 16 là gì?", "options": ["32", "20", "24", "30"], "correctIndex": 0, "explanation": "Mỗi số gấp đôi số đứng trước." },
+    { "id": "logic-002", "category": "Logic", "question": "Nếu hôm nay là thứ Hai, 10 ngày nữa là thứ mấy?", "options": ["Thứ Năm", "Thứ Tư", "Thứ Sáu", "Chủ Nhật"], "correctIndex": 0, "explanation": "10 ngày tương đương một tuần và 3 ngày, nên là thứ Năm." },
+    { "id": "logic-003", "category": "Logic", "question": "Một tá có bao nhiêu món?", "options": ["12", "10", "20", "24"], "correctIndex": 0, "explanation": "Một tá bằng 12 đơn vị." },
+    { "id": "logic-004", "category": "Logic", "question": "Hình vuông có bao nhiêu trục đối xứng?", "options": ["4", "2", "1", "8"], "correctIndex": 0, "explanation": "Hình vuông có hai đường chéo và hai đường trung trực là bốn trục đối xứng." },
+    { "id": "game-001", "category": "Game", "question": "Trong Oẳn Tù Tì, lựa chọn nào thắng Kéo?", "options": ["Búa", "Bao", "Kéo", "Cả ba"], "correctIndex": 0, "explanation": "Búa thắng Kéo." },
+    { "id": "game-002", "category": "Game", "question": "Trong Xì Dách, tổng điểm nào khiến người chơi quắc?", "options": ["Lớn hơn 21", "Đúng 21", "Nhỏ hơn 16", "Đúng 18"], "correctIndex": 0, "explanation": "Tổng điểm vượt 21 là quắc." },
+    { "id": "game-003", "category": "Game", "question": "Trong Bầu Cua, mỗi ván thường lắc bao nhiêu viên?", "options": ["3", "1", "2", "6"], "correctIndex": 0, "explanation": "Bầu Cua sử dụng ba viên xúc xắc linh vật." },
+    { "id": "game-004", "category": "Game", "question": "Tài Xỉu dùng ba xúc xắc, tổng 3 đến 10 thường được gọi là gì?", "options": ["Xỉu", "Tài", "Chẵn", "Hòa"], "correctIndex": 0, "explanation": "Theo luật đang dùng của bot, tổng 3-10 là Xỉu." }
+  ]
+}

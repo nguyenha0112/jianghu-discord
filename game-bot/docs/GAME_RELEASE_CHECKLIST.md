@@ -64,7 +64,7 @@ Cập nhật: 2026-09-21
 | Bầu Cua | [x] | [x] | [~] | [~] | [ ] | [x] | Beta |
 | Xì Dách | [x] | [x] | [x] PNG 900×420 | [x] chủ ván + khóa channel | [~] khôi phục ván đang chơi | [x] | Beta tốt |
 | Oẳn Tù Tì | [x] | [x] | Không bắt buộc | [x] khóa channel | [x] khôi phục lobby/lựa chọn | [x] 10 thắng/ngày | Beta |
-| Quiz Nhanh | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | Planned |
+| Quiz Nhanh | [x] | [x] | Không bắt buộc | [x] khóa channel + một lượt/người | [x] giữ hạn giờ | [x] 15 thắng/ngày | Beta |
 
 ## Kiểm tra Xì Dách đã đạt trong bản hiện tại
 

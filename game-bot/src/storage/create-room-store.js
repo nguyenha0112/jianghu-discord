@@ -145,6 +145,10 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
     return Boolean(getRoom(channelId)?.enabled);
   }
 
+  function listRooms() {
+    return { ...ensureCache().rooms };
+  }
+
   function clearPendingUpsert(channelId, updatedAt) {
     const store = ensureCache();
     if (store.pendingUpserts[channelId]?.updatedAt === updatedAt) {
@@ -185,6 +189,7 @@ function createRoomStore({ gameKey, fileName, defaults = {} }) {
     enableRoomPersistent,
     disableRoom,
     getRoom,
+    listRooms,
     isEnabledRoom,
     syncPending
   };

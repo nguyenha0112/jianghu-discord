@@ -9,6 +9,7 @@ const { hydrateRooms: hydrateBauCuaRooms } = require("./storage/baucua-room-stor
 const { hydrateRooms: hydrateVietnameseKingRooms } = require("./storage/vietnamese-king-room-store");
 const { hydrateRooms: hydrateXiDachRooms } = require("./storage/xidach-room-store");
 const { hydrateRooms: hydrateRpsRooms } = require("./storage/rps-room-store");
+const { hydrateRooms: hydrateQuickQuizRooms } = require("./storage/quick-quiz-room-store");
 const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-store");
 const { hydrateRooms: hydrateServerLogRooms } = require("./storage/serverlog-room-store");
 const { announceMemberLeave } = require("./lib/serverlog-announcer");
@@ -32,6 +33,7 @@ const {
 } = require("./services/xidach-service");
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 const { handleMessage: handleRpsMessage, handleButtonInteraction: handleRpsButtonInteraction } = require("./services/rps-service");
+const { handleMessage: handleQuickQuizMessage, handleButtonInteraction: handleQuickQuizButtonInteraction, resumeSessions: resumeQuickQuizSessions } = require("./services/quick-quiz-service");
 const { recoverPendingData } = require("./services/data-recovery-service");
 
 const token = process.env.DISCORD_TOKEN;
@@ -187,6 +189,7 @@ logStartup("commands loaded", { count: client.commands.size });
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Jianghu Game Bot đã đăng nhập với tên ${readyClient.user.tag}`);
   checkSupabaseHealth().catch(() => {});
+  resumeQuickQuizSessions(readyClient).catch((error) => console.error("Quick Quiz resume failed", error));
   if (!enableMemberLogs) {
     console.warn("[serverlog] member leave logs disabled. Set DISCORD_ENABLE_MEMBER_LOGS=true after enabling SERVER MEMBERS INTENT in Discord Developer Portal.");
   }
@@ -252,6 +255,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return false;
     });
     if (rpsHandled) {
+      return;
+    }
+
+    const quizHandled = await handleQuickQuizButtonInteraction(interaction).catch((error) => {
+      console.error("Quick Quiz button interaction failed", error);
+      return false;
+    });
+    if (quizHandled) {
       return;
     }
   }
@@ -349,6 +360,10 @@ client.on(Events.MessageCreate, async (message) => {
     finalResult = await handleRpsMessage(message);
   }
   if (!finalResult) {
+    handlerName = "quick-quiz";
+    finalResult = await handleQuickQuizMessage(message);
+  }
+  if (!finalResult) {
     return;
   }
 
@@ -397,6 +412,7 @@ async function bootstrap() {
     hydrateVietnameseKingRooms(),
     hydrateXiDachRooms(),
     hydrateRpsRooms(),
+    hydrateQuickQuizRooms(),
     hydrateLevelUpRooms(),
     hydrateServerLogRooms()
   ]);

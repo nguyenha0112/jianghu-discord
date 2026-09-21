@@ -7,6 +7,6 @@
     { "key": "baucua", "name": "Bầu Cua", "status": "live", "category": "casino", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "random", "rewardPolicy": "betting-v1" },
     { "key": "xidach", "name": "Xì Dách", "status": "live", "category": "card", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "standard-52-card-deck", "rewardPolicy": "betting-v1", "visual": { "format": "png", "width": 900, "height": 420 } },
     { "key": "rock_paper_scissors", "name": "Oẳn Tù Tì", "status": "live", "category": "pvp", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "fixed-rules", "rewardPolicy": "pvp-light-v1", "rewardCap": { "winsPerDay": 10, "xuPerWin": 20, "xpPerWin": 3 } },
-    { "key": "quick_quiz", "name": "Quiz Nhanh", "status": "planned", "category": "quiz", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "curated-questions", "rewardPolicy": "quiz-v1" }
+    { "key": "quick_quiz", "name": "Quiz Nhanh", "status": "live", "category": "quiz", "entry": "!play", "controls": "buttons", "roomScoped": true, "dataSource": "curated-questions-v1", "rewardPolicy": "quiz-v1", "rewardCap": { "winsPerDay": 15, "xuPerWin": 15, "xpPerWin": 4 }, "roundSeconds": 20 }
   ]
 }

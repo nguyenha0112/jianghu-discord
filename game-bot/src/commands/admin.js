@@ -6,6 +6,7 @@ const { enableRoom: enableTaiXiuRoom, disableRoom: disableTaiXiuRoom } = require
 const { enableRoom: enableBauCuaRoom, disableRoom: disableBauCuaRoom } = require("../storage/baucua-room-store");
 const { enableRoom: enableXiDachRoom, disableRoom: disableXiDachRoom } = require("../storage/xidach-room-store");
 const { enableRoom: enableRpsRoom, disableRoom: disableRpsRoom } = require("../storage/rps-room-store");
+const { enableRoom: enableQuickQuizRoom, disableRoom: disableQuickQuizRoom } = require("../storage/quick-quiz-room-store");
 const {
   enableRoomPersistent: enableLevelUpRoomPersistent,
   disableRoom: disableLevelUpRoom
@@ -67,6 +68,8 @@ module.exports = {
           { name: "Xóa phòng Xì Dách", value: "xidach_xoa" },
           { name: "Tạo phòng Oẳn Tù Tì", value: "rps_tao" },
           { name: "Xóa phòng Oẳn Tù Tì", value: "rps_xoa" },
+          { name: "Tạo phòng Quiz Nhanh", value: "quiz_tao" },
+          { name: "Xóa phòng Quiz Nhanh", value: "quiz_xoa" },
           { name: "Tạo phòng thông báo lên cấp", value: "levelup_tao" },
           { name: "Xóa phòng thông báo lên cấp", value: "levelup_xoa" },
           { name: "Tạo phòng log người rời server", value: "serverlog_tao" },
@@ -163,6 +166,20 @@ module.exports = {
       if (action === "rps_xoa") {
         disableRpsRoom(interaction.channelId);
         await interaction.editReply(`Đã xóa cấu hình Oẳn Tù Tì ở <#${interaction.channelId}>.`);
+        return;
+      }
+
+      if (action === "quiz_tao") {
+        enableQuickQuizRoom(interaction.channelId, meta);
+        await setTopic(interaction, "Quiz Nhanh | !play mở câu | 4 nút đáp án | 20 giây | !stop công bố đáp án");
+        await sendGuide(interaction, "Hướng dẫn Quiz Nhanh", "Nhắn `!play`, sau đó bấm một trong bốn đáp án. Người trả lời đúng đầu tiên nhận thưởng.", 0x3498db);
+        await interaction.editReply(`Đã bật <#${interaction.channelId}> thành phòng Quiz Nhanh.`);
+        return;
+      }
+
+      if (action === "quiz_xoa") {
+        disableQuickQuizRoom(interaction.channelId);
+        await interaction.editReply(`Đã xóa cấu hình Quiz Nhanh ở <#${interaction.channelId}>.`);
         return;
       }
 
