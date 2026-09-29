@@ -13,7 +13,7 @@ const { hydrateRooms: hydrateQuickQuizRooms } = require("./storage/quick-quiz-ro
 const { hydrateRooms: hydrateLevelUpRooms } = require("./storage/levelup-room-store");
 const { hydrateRooms: hydrateServerLogRooms } = require("./storage/serverlog-room-store");
 const { announceMemberLeave } = require("./lib/serverlog-announcer");
-const { getSupabaseClient, hasSupabaseConfig } = require("./lib/supabase");
+const { hasSupabaseConfig } = require("./lib/supabase");
 const { commandData } = require("./shared/command-registry");
 const { handlePvpLobbyInteraction, handleWordChainMessage } = require("./services/word-chain-service");
 const {
@@ -34,7 +34,7 @@ const {
 const { handleMessage: handleVietnameseKingMessage } = require("./services/vietnamese-king-service");
 const { handleMessage: handleRpsMessage, handleButtonInteraction: handleRpsButtonInteraction } = require("./services/rps-service");
 const { handleMessage: handleQuickQuizMessage, handleButtonInteraction: handleQuickQuizButtonInteraction, resumeSessions: resumeQuickQuizSessions } = require("./services/quick-quiz-service");
-const { recoverPendingData } = require("./services/data-recovery-service");
+const { runSupabaseKeepalive, getSupabaseKeepaliveStatus } = require("./services/supabase-keepalive-service");
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -50,6 +50,10 @@ function logStartup(message, meta = {}) {
 }
 
 let supabaseReady = false;
+const configuredKeepaliveIntervalMs = Number(process.env.SUPABASE_KEEPALIVE_INTERVAL_MS);
+const supabaseKeepaliveIntervalMs = Number.isFinite(configuredKeepaliveIntervalMs) && configuredKeepaliveIntervalMs > 0
+  ? Math.max(60000, configuredKeepaliveIntervalMs)
+  : 15 * 60 * 1000;
 
 function sendHealthHeartbeat() {
   if (typeof process.send === "function") {
@@ -57,25 +61,20 @@ function sendHealthHeartbeat() {
       type: "bot-health",
       service: "game-bot",
       discordReady: client.isReady(),
-      supabaseReady
+      supabaseReady,
+      supabaseKeepalive: getSupabaseKeepaliveStatus()
     });
   }
 }
 
 async function checkSupabaseHealth() {
-  if (!hasSupabaseConfig()) {
-    supabaseReady = false;
-    sendHealthHeartbeat();
-    return false;
-  }
-  try {
-    const { error } = await getSupabaseClient().from("players").select("user_id", { head: true, count: "exact" });
-    supabaseReady = !error;
-    if (supabaseReady) {
-      await recoverPendingData();
-    }
-  } catch (error) {
-    supabaseReady = false;
+  const previousReady = supabaseReady;
+  const status = await runSupabaseKeepalive();
+  supabaseReady = status.ready;
+  if (supabaseReady && !previousReady) {
+    console.log("[supabase] heartbeat thành công", { lastSuccessAt: status.lastSuccessAt, intervalMs: supabaseKeepaliveIntervalMs });
+  } else if (!supabaseReady) {
+    console.error("[supabase] heartbeat thất bại", { failures: status.consecutiveFailures, error: status.lastError });
   }
   sendHealthHeartbeat();
   return supabaseReady;
@@ -196,7 +195,7 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 setInterval(sendHealthHeartbeat, 20000).unref();
-setInterval(() => checkSupabaseHealth().catch(() => {}), 60000).unref();
+setInterval(() => checkSupabaseHealth().catch(() => {}), supabaseKeepaliveIntervalMs).unref();
 
 client.on(Events.GuildMemberRemove, async (member) => {
   if (!enableMemberLogs) {

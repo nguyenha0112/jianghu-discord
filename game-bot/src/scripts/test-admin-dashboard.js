@@ -1,3 +1,8 @@
+process.env.SUPABASE_URL = "";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "";
+process.env.SUPABASE_SECRET_KEY = "";
+process.env.SUPABASE_PUBLISHABLE_KEY = "";
+
 const { enableRoom: enableRpsRoom, disableRoom: disableRpsRoom } = require("../storage/rps-room-store");
 const { enableRoom: enableQuizRoom, disableRoom: disableQuizRoom } = require("../storage/quick-quiz-room-store");
 const { collectDashboard, buildAdminDashboardEmbed } = require("../services/admin-dashboard-service");
@@ -15,7 +20,7 @@ function main() {
   if (report.activeCount !== 1) throw new Error(`Expected 1 active game, received ${report.activeCount}`);
   const json = buildAdminDashboardEmbed(guildId).toJSON();
   const rendered = JSON.stringify(json);
-  if (!rendered.includes(rpsChannel) || !rendered.includes(quizChannel) || !rendered.includes("Đồng bộ dữ liệu")) {
+  if (!rendered.includes(rpsChannel) || !rendered.includes(quizChannel) || !rendered.includes("Supabase")) {
     throw new Error("Dashboard does not contain expected room and sync information");
   }
   disableRpsRoom(rpsChannel);

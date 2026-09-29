@@ -15,6 +15,7 @@ const { getSessionStatus: getBauCuaSession } = require("./baucua-service");
 const { getSessionStatus: getXiDachSession } = require("./xidach-service");
 const { getSessionStatus: getRpsSession } = require("./rps-service");
 const { getSessionStatus: getQuickQuizSession } = require("./quick-quiz-service");
+const { getSupabaseKeepaliveStatus } = require("./supabase-keepalive-service");
 
 const STORE_DEFINITIONS = [
   { key: "word_chain", name: "Nối Từ", store: wordChainStore, kind: "game", getSession: getWordChainSession },
@@ -63,11 +64,17 @@ function roomSummary(item) {
 
 function buildAdminDashboardEmbed(guildId) {
   const report = collectDashboard(guildId);
+  const keepalive = getSupabaseKeepaliveStatus();
   const gameLines = report.items.filter((item) => item.kind === "game").map(roomSummary);
   const systemLines = report.items.filter((item) => item.kind === "system").map(roomSummary);
-  const syncText = report.pendingTotal === 0
+  const queueText = report.pendingTotal === 0
     ? "✅ Không có thay đổi phòng nào đang chờ đồng bộ."
     : `⚠️ Có **${report.pendingTotal}** thay đổi phòng đang chờ Supabase. Bot vẫn dùng bản local và sẽ tự thử lại.`;
+  const heartbeatText = keepalive.ready
+    ? `✅ Heartbeat hoạt động. Lần thành công gần nhất: <t:${Math.floor(new Date(keepalive.lastSuccessAt).getTime() / 1000)}:R>.`
+    : keepalive.configured
+      ? `⚠️ Heartbeat đang lỗi (${keepalive.consecutiveFailures} lần liên tiếp).`
+      : "⚪ Supabase chưa được cấu hình.";
   return new EmbedBuilder()
     .setColor(report.pendingTotal === 0 ? 0x2ecc71 : 0xf39c12)
     .setTitle("🛠️ Trạng thái Jianghu Game Bot")
@@ -75,7 +82,7 @@ function buildAdminDashboardEmbed(guildId) {
     .addFields(
       { name: "🎮 Phòng game", value: gameLines.join("\n") || "Chưa có phòng game." },
       { name: "📣 Phòng hệ thống", value: systemLines.join("\n") || "Chưa có phòng hệ thống." },
-      { name: "☁️ Đồng bộ dữ liệu", value: syncText }
+      { name: "☁️ Supabase", value: `${heartbeatText}\n${queueText}` }
     )
     .setFooter({ text: "Bảng chỉ hiển thị cấu hình thuộc server hiện tại." })
     .setTimestamp();

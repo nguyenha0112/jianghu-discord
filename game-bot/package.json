@@ -27,7 +27,8 @@
     "catalog:test": "node src/scripts/test-game-catalog.js",
     "rps:test": "node src/scripts/test-rps.js",
     "quiz:test": "node src/scripts/test-quick-quiz.js",
-    "dashboard:test": "node src/scripts/test-admin-dashboard.js"
+    "dashboard:test": "node src/scripts/test-admin-dashboard.js",
+    "keepalive:test": "node src/scripts/test-supabase-keepalive.js"
   },
   "license": "MIT",
   "dependencies": {

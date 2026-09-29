@@ -81,6 +81,7 @@ Mỗi game mới phải có cùng cấu trúc:
 ### Giai đoạn 3 - Vận hành
 
 - [~] Dashboard trạng thái phòng, ván đang hoạt động và hàng chờ Supabase; lỗi gần nhất còn chờ.
+- [x] Heartbeat Supabase định kỳ, health status và cảnh báo khi mất kết nối.
 - [ ] Báo cáo Xu sinh ra/tiêu đi theo ngày.
 - [ ] Cảnh báo game có tỷ lệ lỗi hoặc payout bất thường.
 - [ ] UAT checklist cho mobile, desktop và nhiều người chơi đồng thời.
