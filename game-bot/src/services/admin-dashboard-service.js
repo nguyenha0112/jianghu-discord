@@ -16,6 +16,7 @@ const { getSessionStatus: getXiDachSession } = require("./xidach-service");
 const { getSessionStatus: getRpsSession } = require("./rps-service");
 const { getSessionStatus: getQuickQuizSession } = require("./quick-quiz-service");
 const { getSupabaseKeepaliveStatus } = require("./supabase-keepalive-service");
+const { getEconomyPolicy } = require("../config/economy-policies");
 
 const STORE_DEFINITIONS = [
   { key: "word_chain", name: "Nối Từ", store: wordChainStore, kind: "game", getSession: getWordChainSession },
@@ -75,6 +76,14 @@ function buildAdminDashboardEmbed(guildId) {
     : keepalive.configured
       ? `⚠️ Heartbeat đang lỗi (${keepalive.consecutiveFailures} lần liên tiếp).`
       : "⚪ Supabase chưa được cấu hình.";
+  const betting = getEconomyPolicy("betting-v1");
+  const rps = getEconomyPolicy("pvp-light-v1");
+  const quiz = getEconomyPolicy("quiz-v1");
+  const economyText = [
+    `**Game cược:** ${betting.minBetXu.toLocaleString("vi-VN")} - ${betting.maxBetXu.toLocaleString("vi-VN")} Xu/lượt`,
+    `**Oẳn Tù Tì:** ${rps.winXu} Xu/thắng • tối đa ${rps.rewardedWinsPerDay} thưởng/ngày`,
+    `**Quiz Nhanh:** ${quiz.winXu} Xu/thắng • tối đa ${quiz.rewardedWinsPerDay} thưởng/ngày`
+  ].join("\n");
   return new EmbedBuilder()
     .setColor(report.pendingTotal === 0 ? 0x2ecc71 : 0xf39c12)
     .setTitle("🛠️ Trạng thái Jianghu Game Bot")
@@ -82,6 +91,7 @@ function buildAdminDashboardEmbed(guildId) {
     .addFields(
       { name: "🎮 Phòng game", value: gameLines.join("\n") || "Chưa có phòng game." },
       { name: "📣 Phòng hệ thống", value: systemLines.join("\n") || "Chưa có phòng hệ thống." },
+      { name: "🪙 Kinh tế game", value: economyText },
       { name: "☁️ Supabase", value: `${heartbeatText}\n${queueText}` }
     )
     .setFooter({ text: "Bảng chỉ hiển thị cấu hình thuộc server hiện tại." })

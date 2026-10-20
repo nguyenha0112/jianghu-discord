@@ -8,6 +8,7 @@ const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/vietnamese-king-room-store");
 const { getVietnameseKingRanking, updateVietnameseKingRanking } = require("../storage/vietnamese-king-ranking-store");
+const { getEconomyPolicy } = require("../config/economy-policies");
 
 const DATA_PATH = path.join(__dirname, "..", "..", "data", "vietnamese-king-puzzles.json");
 const CUSTOM_PHRASES_PATH = path.join(__dirname, "..", "..", "data", "custom-vietnamese-phrases.txt");
@@ -25,10 +26,11 @@ const HINT_KEYWORDS = new Set(["!goiy", "!hint"]);
 const RANK_KEYWORDS = new Set(["!rank", "!bxh", "!xephang"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 
-const POINT_REWARD_XU = 8;
-const WIN_BONUS_XU = 20;
-const POINT_REWARD_XP = 5;
-const WIN_BONUS_XP = 15;
+const vietnameseKingEconomy = getEconomyPolicy("word-game-v1").vietnameseKing;
+const POINT_REWARD_XU = vietnameseKingEconomy.pointXu;
+const WIN_BONUS_XU = vietnameseKingEconomy.winBonusXu;
+const POINT_REWARD_XP = vietnameseKingEconomy.pointXp;
+const WIN_BONUS_XP = vietnameseKingEconomy.winBonusXp;
 const MAX_RECENT_PUZZLES = 180;
 const MAX_GLOBAL_RECENT_PUZZLES = 600;
 const HINT_POINT_PENALTY = 1;

@@ -14,6 +14,7 @@ const { addPlayerXp } = require("../lib/player-progression");
 const { canManageGameRoom } = require("../lib/room-admin");
 const { buildProgressBar } = require("../lib/ui-theme");
 const { buildCurrencyPairAttachment } = require("../lib/currency-assets");
+const { getEconomyPolicy } = require("../config/economy-policies");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { enableRoom, getRoom, isEnabledRoom } = require("../storage/xidach-room-store");
@@ -46,10 +47,11 @@ const TEXT_COMMAND_ALIASES = new Map([
   ["!help", "Xem huong dan nhanh"]
 ]);
 
-const MIN_BET = 20;
-const MAX_BET = 250000;
-const WIN_XP_GAIN = 4;
-const BET_XP_GAIN = 1;
+const bettingEconomy = getEconomyPolicy("betting-v1");
+const MIN_BET = bettingEconomy.minBetXu;
+const MAX_BET = bettingEconomy.maxBetXu;
+const WIN_XP_GAIN = bettingEconomy.winXp;
+const BET_XP_GAIN = bettingEconomy.betXp;
 
 const ACTION_PREFIX = "xidach:action:";
 const MODAL_PREFIX = "xidach:modal:";

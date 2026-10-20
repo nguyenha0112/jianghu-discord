@@ -12,6 +12,7 @@ const { buildProgressBar, emojiToTwemojiUrl } = require("../lib/ui-theme");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/baucua-room-store");
+const { getEconomyPolicy } = require("../config/economy-policies");
 const {
   updateBauCuaRanking,
   getBauCuaRanking,
@@ -31,10 +32,11 @@ const HISTORY_KEYWORDS = new Set(["!lichsu", "!history"]);
 const PROFILE_KEYWORDS = new Set(["!me", "!toi", "!thongke"]);
 
 const BETTING_DURATION_MS = 30000;
-const MIN_BET = 20;
-const MAX_BET = 250000;
-const BET_XP_GAIN = 1;
-const WIN_XP_GAIN = 4;
+const bettingEconomy = getEconomyPolicy("betting-v1");
+const MIN_BET = bettingEconomy.minBetXu;
+const MAX_BET = bettingEconomy.maxBetXu;
+const BET_XP_GAIN = bettingEconomy.betXp;
+const WIN_XP_GAIN = bettingEconomy.winXp;
 
 const BET_BUTTON_PREFIX = "baucua:bet:";
 const ACTION_BUTTON_PREFIX = "baucua:action:";

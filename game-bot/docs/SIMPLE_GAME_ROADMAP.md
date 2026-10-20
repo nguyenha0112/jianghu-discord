@@ -70,7 +70,7 @@ Mỗi game mới phải có cùng cấu trúc:
 - [x] Đổi nghề nghiệp thành progression độc lập, tối đa cấp 50.
 - [x] Giữ dữ liệu cũ và feature flag `ENABLE_CULTIVATION_SYSTEM`.
 - [ ] Chuẩn hóa `/admin` thành danh sách game và thao tác tạo/xóa phòng.
-- [ ] Tạo cấu hình reward cap dùng chung cho mọi game.
+- [x] Tạo cấu hình thưởng/cược tập trung và validation tự động cho mọi game.
 
 ### Giai đoạn 2 - Game nhẹ
 

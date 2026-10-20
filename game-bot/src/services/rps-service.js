@@ -3,6 +3,7 @@ const { addPlayerXp } = require("../lib/player-progression");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { enableRoom, getRoom, isEnabledRoom } = require("../storage/rps-room-store");
+const { getEconomyPolicy } = require("../config/economy-policies");
 
 const sessions = new Map();
 const locks = new Set();
@@ -14,9 +15,10 @@ const CHOICES = {
   paper: { label: "Bao", emoji: "✋", beats: "rock" },
   scissors: { label: "Kéo", emoji: "✌️", beats: "paper" }
 };
-const REWARD_XU = 20;
-const REWARD_XP = 3;
-const DAILY_REWARD_LIMIT = 10;
+const rpsEconomy = getEconomyPolicy("pvp-light-v1");
+const REWARD_XU = rpsEconomy.winXu;
+const REWARD_XP = rpsEconomy.winXp;
+const DAILY_REWARD_LIMIT = rpsEconomy.rewardedWinsPerDay;
 const PREFIX = "rps:";
 
 function dayKey(now = new Date()) {

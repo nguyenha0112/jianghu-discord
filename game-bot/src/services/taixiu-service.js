@@ -16,6 +16,7 @@ const {
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { getRoom, isEnabledRoom } = require("../storage/taixiu-room-store");
+const { getEconomyPolicy } = require("../config/economy-policies");
 
 const sessions = new Map();
 const modalLocks = new Map();
@@ -26,11 +27,12 @@ const HELP_KEYWORDS = new Set(["!help", "!huongdan"]);
 const STATUS_KEYWORDS = new Set(["!trangthai", "!status"]);
 const CLOSE_KEYWORDS = new Set(["!chot", "!lac"]);
 
-const MIN_BET = 20;
-const MAX_BET = 250000;
+const bettingEconomy = getEconomyPolicy("betting-v1");
+const MIN_BET = bettingEconomy.minBetXu;
+const MAX_BET = bettingEconomy.maxBetXu;
 const BETTING_DURATION_MS = 45000;
-const BET_XP_GAIN = 1;
-const WIN_XP_GAIN = 4;
+const BET_XP_GAIN = bettingEconomy.betXp;
+const WIN_XP_GAIN = bettingEconomy.winXp;
 const MODAL_LOCK_MS = 3000;
 
 const BET_BUTTON_PREFIX = "taixiu:bet:";

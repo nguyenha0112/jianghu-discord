@@ -5,6 +5,7 @@ const { canManageGameRoom } = require("../lib/room-admin");
 const { appendTransaction } = require("../storage/transaction-store");
 const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-store");
 const { enableRoom, getRoom, isEnabledRoom, listRooms } = require("../storage/quick-quiz-room-store");
+const { getEconomyPolicy } = require("../config/economy-policies");
 
 const sessions = new Map();
 const timers = new Map();
@@ -14,9 +15,10 @@ const STOPS = new Set(["!stop"]);
 const HELPS = new Set(["!help", "!huongdan"]);
 const PREFIX = "quiz:";
 const ROUND_MS = 20000;
-const REWARD_XU = 15;
-const REWARD_XP = 4;
-const DAILY_REWARD_LIMIT = 15;
+const quizEconomy = getEconomyPolicy("quiz-v1");
+const REWARD_XU = quizEconomy.winXu;
+const REWARD_XP = quizEconomy.winXp;
+const DAILY_REWARD_LIMIT = quizEconomy.rewardedWinsPerDay;
 const RECENT_LIMIT = 20;
 
 function today() { return new Date().toISOString().slice(0, 10); }

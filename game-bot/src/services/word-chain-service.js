@@ -9,20 +9,22 @@ const { ensurePlayer, getPlayer, updatePlayer } = require("../storage/player-sto
 const { getRoom, isEnabledRoom } = require("../storage/word-chain-room-store");
 const { listCandidatePhrases, recordCandidatePhrase, updateCandidatePhrase } = require("../storage/word-chain-candidate-store");
 const { getWordChainRanking, updateWordChainRanking } = require("../storage/word-chain-ranking-store");
+const { getEconomyPolicy } = require("../config/economy-policies");
 
 const sessions = new Map();
 const recentHistoryByGuild = new Map();
 
 const MAX_RECENT_WORDS = 30;
-const MIN_PVP_REWARDED_PLAYERS = 2;
-const PVP_POINT_REWARD_XU = 12;
-const PVP_WIN_BONUS_XU = 30;
-const PVP_CHECKPOINT_INTERVAL = 25;
-const PVP_CHECKPOINT_LEADER_BONUS_XU = 60;
-const PVE_POINT_REWARD_XU = 10;
-const PVE_WIN_BONUS_XU = 20;
-const WORD_CHAIN_POINT_XP = 4;
-const WORD_CHAIN_WIN_BONUS_XP = 12;
+const wordChainEconomy = getEconomyPolicy("word-game-v1").wordChain;
+const MIN_PVP_REWARDED_PLAYERS = wordChainEconomy.minPvpRewardedPlayers;
+const PVP_POINT_REWARD_XU = wordChainEconomy.pvpPointXu;
+const PVP_WIN_BONUS_XU = wordChainEconomy.pvpWinBonusXu;
+const PVP_CHECKPOINT_INTERVAL = wordChainEconomy.pvpCheckpointInterval;
+const PVP_CHECKPOINT_LEADER_BONUS_XU = wordChainEconomy.pvpCheckpointLeaderBonusXu;
+const PVE_POINT_REWARD_XU = wordChainEconomy.pvePointXu;
+const PVE_WIN_BONUS_XU = wordChainEconomy.pveWinBonusXu;
+const WORD_CHAIN_POINT_XP = wordChainEconomy.pointXp;
+const WORD_CHAIN_WIN_BONUS_XP = wordChainEconomy.winBonusXp;
 const BOT_PVE_USER_ID = "jianghu-pve-bot";
 const BOT_PVE_NAME = "Jianghu Bot";
 
