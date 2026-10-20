@@ -29,7 +29,8 @@
     "quiz:test": "node src/scripts/test-quick-quiz.js",
     "dashboard:test": "node src/scripts/test-admin-dashboard.js",
     "keepalive:test": "node src/scripts/test-supabase-keepalive.js",
-    "economy:test": "node src/scripts/test-economy-policies.js"
+    "economy:test": "node src/scripts/test-economy-policies.js",
+    "verify": "node src/scripts/run-ci-tests.js"
   },
   "license": "MIT",
   "dependencies": {

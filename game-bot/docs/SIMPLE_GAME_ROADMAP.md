@@ -85,6 +85,7 @@ Mỗi game mới phải có cùng cấu trúc:
 - [ ] Báo cáo Xu sinh ra/tiêu đi theo ngày.
 - [ ] Cảnh báo game có tỷ lệ lỗi hoặc payout bất thường.
 - [ ] UAT checklist cho mobile, desktop và nhiều người chơi đồng thời.
+- [x] CI tự động chạy toàn bộ kiểm tra cốt lõi trước mỗi lần Render triển khai commit mới.
 
 ## Tiêu chí phát hành một game
 

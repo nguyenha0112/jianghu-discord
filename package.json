@@ -8,6 +8,7 @@
     "start": "node scripts/start-bots.js",
     "check": "node --check scripts/start-bots.js && node --check scripts/process-supervisor.js",
     "health:test": "node scripts/test-process-supervisor.js",
-    "alerts:test": "node scripts/test-discord-alerts.js"
+    "alerts:test": "node scripts/test-discord-alerts.js",
+    "verify": "npm run check && npm run health:test && npm run alerts:test && npm --prefix chat-bot run check && npm --prefix game-bot run verify"
   }
 }

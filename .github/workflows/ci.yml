@@ -25,7 +25,7 @@ jobs:
 
       - name: Install chat-bot dependencies
         working-directory: chat-bot
-        run: npm install
+        run: npm ci
 
       - name: Check chat-bot
         working-directory: chat-bot
@@ -33,15 +33,14 @@ jobs:
 
       - name: Install game-bot dependencies
         working-directory: game-bot
-        run: npm install
+        run: npm ci
 
-      - name: Check game-bot
+      - name: Verify game-bot gameplay and data flows
         working-directory: game-bot
-        run: npm run check
+        run: npm run verify
 
-      - name: Check game-bot register script
-        working-directory: game-bot
-        run: npm run check:register
+      - name: Verify process supervisor and alerts
+        run: npm run check && npm run health:test && npm run alerts:test
 
   secret-scan:
     name: Secret Scan
